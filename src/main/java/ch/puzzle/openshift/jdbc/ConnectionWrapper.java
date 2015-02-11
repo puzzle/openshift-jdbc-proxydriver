@@ -1,11 +1,15 @@
 package ch.puzzle.openshift.jdbc;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.Properties;
+
 /**
  * Created by bschwaller on 11.02.15.
  */
 public class ConnectionWrapper {
-
-    public static Connection wrap(Connection con) {
-        return (Connection) Proxy.newProxyInstance(con.getClass().getClassLoader(), new Class[]{Connection.class}, new GenericLoggingHandler(con));
+    public Connection wrap(String url, Properties info) throws SQLException {
+        return DriverManager.getConnection(url, info);
     }
 }
