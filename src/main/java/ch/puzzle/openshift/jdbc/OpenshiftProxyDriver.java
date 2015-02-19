@@ -15,7 +15,7 @@ public class OpenshiftProxyDriver implements Driver {
     static final String URL_PREFIX = "jdbc:openshiftproxy://";
     static final String URL_PROTOCOL_HOST_DELIMITER = "://";
     static final String PARAMETER_DELIMITER = "&";
-    static final String NAMESPACE_PARAMETER_PREFIX = "namespace=";
+    static final String DOMAIN_PARAMETER_PREFIX = "domain=";
     static final String CARTRIDGE_PARAMETER_PREFIX = "cartridge=";
     static final String DRIVER_PARAMETER_PREFIX = "driver=";
     static final String FORWARDED_PORT_PARAMETER_PREFIX = "externalforwardedport=";
@@ -27,9 +27,9 @@ public class OpenshiftProxyDriver implements Driver {
 
     private String openshiftUser;
     private String openshiftPassword;
-    private String broker;
+    private String openshiftServer;
     private String applicationName;
-    private String namespace;
+    private String domain;
     private String cardridge;
     private String driver;
     private Integer externalForwardedPort;
@@ -61,12 +61,12 @@ public class OpenshiftProxyDriver implements Driver {
         verifyAndExtractUserAndPasswordProperties(info);
 
         try {
-            communicator.connect(broker, openshiftUser, openshiftPassword);
-            final DatabaseData databaseData = communicator.readDatabaseData(applicationName, namespace, cardridge);
+            communicator.connect(openshiftServer, openshiftUser, openshiftPassword);
+            final DatabaseData databaseData = communicator.readDatabaseData(applicationName, domain, cardridge);
             int port;
             if (!hasForwardedPortParameter()) {
                 logger.info("Start port forwarding");
-                port = communicator.startPortForwarding(applicationName, namespace, databaseData.getConnectionUrl());
+                port = communicator.startPortForwarding(applicationName, domain, databaseData.getConnectionUrl());
             } else {
                 logger.info("Use external portforwarding on port " + externalForwardedPort);
                 port = externalForwardedPort;
@@ -151,30 +151,30 @@ public class OpenshiftProxyDriver implements Driver {
 
     private void readParameterFromUrl(String url) {
         final String urlWithoutProtocol = url.substring(URL_PREFIX.length());
-        final String[] brokerWithAppAndParameters = urlWithoutProtocol.split("\\?");
+        final String[] serverWithAppAndParameters = urlWithoutProtocol.split("\\?");
 
-        if (brokerWithAppAndParameters.length == 2) {
+        if (serverWithAppAndParameters.length == 2) {
 
-            String brokerWithApp = brokerWithAppAndParameters[0];
-            String urlParameter = brokerWithAppAndParameters[1];
+            String serverWithApp = serverWithAppAndParameters[0];
+            String urlParameter = serverWithAppAndParameters[1];
 
-            extractAndSetBrokerAndApp(brokerWithApp);
+            extractAndSetServerAndApp(serverWithApp);
             extractAndSetUrlParameter(urlParameter);
         }
     }
 
-    private void extractAndSetBrokerAndApp(String brokerWithApp) {
-        final String[] brokerAndApp = brokerWithApp.split("/");
-        if (brokerAndApp.length == 2) {
-            broker = brokerAndApp[0];
-            applicationName = brokerAndApp[1];
+    private void extractAndSetServerAndApp(String serverWithApp) {
+        final String[] serverAndApp = serverWithApp.split("/");
+        if (serverAndApp.length == 2) {
+            openshiftServer = serverAndApp[0];
+            applicationName = serverAndApp[1];
         }
     }
 
     private void extractAndSetUrlParameter(String urlParameter) {
         for (String parameterValues : urlParameter.split(PARAMETER_DELIMITER)) {
-            if (parameterValues.startsWith(NAMESPACE_PARAMETER_PREFIX)) {
-                namespace = parameterValues.substring(NAMESPACE_PARAMETER_PREFIX.length());
+            if (parameterValues.startsWith(DOMAIN_PARAMETER_PREFIX)) {
+                domain = parameterValues.substring(DOMAIN_PARAMETER_PREFIX.length());
             }
             if (parameterValues.startsWith(CARTRIDGE_PARAMETER_PREFIX)) {
                 cardridge = parameterValues.substring(CARTRIDGE_PARAMETER_PREFIX.length());
@@ -192,16 +192,16 @@ public class OpenshiftProxyDriver implements Driver {
         StringBuilder sb = new StringBuilder("Missing parameter in URL for");
         boolean hasMissingParameter = false;
 
-        if (!isParameterValid(broker)) {
-            sb.append(" brokerUrl");
+        if (!isParameterValid(openshiftServer)) {
+            sb.append(" openshiftServerUrl");
             hasMissingParameter = true;
         }
         if (!isParameterValid(applicationName)) {
             sb.append(" applicationName");
             hasMissingParameter = true;
         }
-        if (!isParameterValid(namespace)) {
-            sb.append(" ").append(NAMESPACE_PARAMETER_PREFIX);
+        if (!isParameterValid(domain)) {
+            sb.append(" ").append(DOMAIN_PARAMETER_PREFIX);
             hasMissingParameter = true;
         }
         if (!isParameterValid(cardridge)) {
@@ -231,7 +231,7 @@ public class OpenshiftProxyDriver implements Driver {
         return url != null
                 && url.regionMatches(true, 0, URL_PREFIX, 0, URL_PREFIX.length())
                 // TODO ab hier in verify auslagern!
-                && url.contains(NAMESPACE_PARAMETER_PREFIX)
+                && url.contains(DOMAIN_PARAMETER_PREFIX)
                 && url.contains(CARTRIDGE_PARAMETER_PREFIX)
                 && url.contains(DRIVER_PARAMETER_PREFIX);
     }

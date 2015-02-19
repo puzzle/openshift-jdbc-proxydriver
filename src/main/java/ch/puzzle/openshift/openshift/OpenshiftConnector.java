@@ -7,12 +7,10 @@ import java.io.IOException;
 
 public class OpenshiftConnector {
 
-    public IOpenShiftConnection getConnection(String brokerUrl, String openshiftUser, String openshiftPassword) {
-        ConnectionBuilder builder = null;
+    public IOpenShiftConnection getConnection(String openshiftServerUrl, String openshiftUser, String openshiftPassword) {
         try {
-            builder = new ConnectionBuilder(brokerUrl);
-            final IOpenShiftConnection iOpenShiftConnection = builder.credentials(openshiftUser, openshiftPassword).create();
-            return iOpenShiftConnection;
+            ConnectionBuilder builder = new ConnectionBuilder(openshiftServerUrl);
+            return builder.credentials(openshiftUser, openshiftPassword).create();
         } catch (IOException e) {
             throw new RuntimeException("Could not create connection", e);
         }

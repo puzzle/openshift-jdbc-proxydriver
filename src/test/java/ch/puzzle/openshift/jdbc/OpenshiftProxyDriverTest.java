@@ -10,7 +10,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Properties;
 
@@ -62,7 +61,7 @@ public class OpenshiftProxyDriverTest {
     }
 
     private String createConnectionUrlWithoutPortForwardParameter(String prefix, String broker, String application, String namespace, String cartridge, String driver) {
-        return prefix + broker + "/" + application + "?" + OpenshiftProxyDriver.NAMESPACE_PARAMETER_PREFIX + namespace + OpenshiftProxyDriver.PARAMETER_DELIMITER + OpenshiftProxyDriver.CARTRIDGE_PARAMETER_PREFIX + cartridge + OpenshiftProxyDriver.PARAMETER_DELIMITER + OpenshiftProxyDriver.DRIVER_PARAMETER_PREFIX + driver;
+        return prefix + broker + "/" + application + "?" + OpenshiftProxyDriver.DOMAIN_PARAMETER_PREFIX + namespace + OpenshiftProxyDriver.PARAMETER_DELIMITER + OpenshiftProxyDriver.CARTRIDGE_PARAMETER_PREFIX + cartridge + OpenshiftProxyDriver.PARAMETER_DELIMITER + OpenshiftProxyDriver.DRIVER_PARAMETER_PREFIX + driver;
     }
 
     @Test(expected = SQLException.class)
@@ -87,7 +86,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenMissingNamespacePrefixInUrl() throws SQLException {
         // given
-        connectionUrl = connectionUrl.replace(OpenshiftProxyDriver.NAMESPACE_PARAMETER_PREFIX, "");
+        connectionUrl = connectionUrl.replace(OpenshiftProxyDriver.DOMAIN_PARAMETER_PREFIX, "");
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -279,7 +278,6 @@ public class OpenshiftProxyDriverTest {
         // given
         String dbUser = "dbUser";
         String dbPwd = "dbPwd";
-        String protocol = "protocol";
         String dbConnectionUrl = "invalidConnectionUrl";
         String dbName = "dbName";
         mockOpenshiftDatabaseDataResponse(dbUser, dbPwd, dbConnectionUrl, dbName);
