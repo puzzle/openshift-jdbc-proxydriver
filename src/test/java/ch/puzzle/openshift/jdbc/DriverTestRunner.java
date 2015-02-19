@@ -37,6 +37,10 @@ public class DriverTestRunner {
         String openshiftUser = System.getProperty("openshiftUser");
         String openshiftUserPassword = System.getProperty("openshiftUserPassword");
 
+        if (openshiftUser == null || openshiftUserPassword == null) {
+            throw new IllegalArgumentException("Missing user or password systemproperty argument! Define the following arguments as on runconfiguration -DopenshiftUser=<openshiftuser> -DopenshiftUserPassword=<password>");
+        }
+
         connect(broker, application, namespace, cartridge, driver, openshiftUser, openshiftUserPassword);
 
     }

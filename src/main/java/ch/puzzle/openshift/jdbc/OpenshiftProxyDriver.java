@@ -46,9 +46,14 @@ public class OpenshiftProxyDriver implements Driver {
 
     public OpenshiftProxyDriver() {
         this.communicator = new OpenshiftCommunicationHandler();
-        this.connectionProxy = new ConnectionWrapper();
+        this.connectionProxy = new ConnectionWrapper(this);
     }
 
+    /**
+     * TODO
+     *
+     * @see com.mysql.jdbc.Driver#connect(String, java.util.Properties)
+     */
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
         logger.info("proxy connection request to " + url);
@@ -71,6 +76,15 @@ public class OpenshiftProxyDriver implements Driver {
         } catch (RuntimeException e) {
             throw new SQLException("Error occurred while communicating with openshift. Reason: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Close driver is a callback method to clean up open connections to openshift.
+     * This method is ment to be called by sql connection close.
+     */
+    public void close() {
+        logger.info("Disconnect openshift communicator");
+        communicator.disconnect();
     }
 
     private boolean hasForwardedPortParameter() {
@@ -107,8 +121,7 @@ public class OpenshiftProxyDriver implements Driver {
 
             String url = createConnectionUrl(connectionData, forwardedPort);
             Properties userPassword = createProperties(connectionData.getDbUser(), connectionData.getDbUserPassword());
-            final Connection connection = connectionProxy.wrap(url, userPassword);
-            return connection;
+            return connectionProxy.wrap(url, userPassword);
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
         }
@@ -209,6 +222,9 @@ public class OpenshiftProxyDriver implements Driver {
     }
 
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean acceptsURL(String url) throws SQLException {
         // TODO  should test url prefix for returning result and if the requested properties are not set then a exception will be thrown???
@@ -220,25 +236,36 @@ public class OpenshiftProxyDriver implements Driver {
                 && url.contains(DRIVER_PARAMETER_PREFIX);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public DriverPropertyInfo[] getPropertyInfo(String url, Properties properties) throws SQLException {
         DriverPropertyInfo adriverpropertyinfo[] = new DriverPropertyInfo[2];
         DriverPropertyInfo driverpropertyinfo = new DriverPropertyInfo(USER_PROPERTY_KEY, null);
         driverpropertyinfo.value = properties.getProperty(USER_PROPERTY_KEY);
+        driverpropertyinfo.description = "Openshift user";
         driverpropertyinfo.required = true;
         adriverpropertyinfo[0] = driverpropertyinfo;
         driverpropertyinfo = new DriverPropertyInfo(PASSWORD_PROPERTY_KEY, null);
         driverpropertyinfo.value = properties.getProperty(PASSWORD_PROPERTY_KEY);
+        driverpropertyinfo.description = "Openshift password";
         driverpropertyinfo.required = true;
         adriverpropertyinfo[1] = driverpropertyinfo;
         return adriverpropertyinfo;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int getMajorVersion() {
         return 1;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int getMinorVersion() {
         return 0;
@@ -252,6 +279,7 @@ public class OpenshiftProxyDriver implements Driver {
 
     @Override
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
+        // TODO
         return logger;
     }
 

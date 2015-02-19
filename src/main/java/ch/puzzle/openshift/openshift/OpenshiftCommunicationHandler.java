@@ -1,6 +1,8 @@
 package ch.puzzle.openshift.openshift;
 
-import com.jcraft.jsch.*;
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.Session;
 import com.openshift.client.IApplication;
 import com.openshift.client.IDomain;
 import com.openshift.client.IOpenShiftConnection;
@@ -9,12 +11,12 @@ import com.openshift.client.cartridge.IEmbeddedCartridge;
 import com.openshift.internal.client.response.CartridgeResourceProperties;
 import com.openshift.internal.client.utils.StreamUtils;
 
-import java.io.*;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.logging.Logger;
 
 /**
@@ -27,52 +29,89 @@ public class OpenshiftCommunicationHandler {
     static final String DATABASE_NAME_KEY = "database_name";
     static final String CONNECTION_URL_KEY = "connection_url";
 
-    private static final String SSH_URL_PREFIX = "ssh://";
-
 
     private Logger logger = Logger.getLogger(OpenshiftCommunicationHandler.class.getName());
+    // TODO implement logging
 
-    private String openshiftUser;
-    private String openshiftPassword;
-
+    private OpenshiftConnector connectionCreator;
+    private SessionConnector sessionConnector;
     private IOpenShiftConnection connection;
     private Session session;
 
-    private OpenshiftConnector connectionCreator;
-    // TODO implement logging
+    private ForwardablePort port;
 
     public OpenshiftCommunicationHandler() {
         this.connectionCreator = new OpenshiftConnector();
+        this.sessionConnector = new SessionConnector();
     }
 
-    public void connect(String broker, String openshiftUser, String openshiftPassword) {
-        connection = connectionCreator.getConnection(broker, openshiftUser, openshiftPassword);
-        this.openshiftUser = openshiftUser;
-        this.openshiftPassword = openshiftPassword;
+    public void connect(String openshiftServer, String openshiftUser, String openshiftPassword) {
+        if (!isConnectedToOpenshiftServer()) {
+            connection = connectionCreator.getConnection(openshiftServer, openshiftUser, openshiftPassword);
+        }
     }
 
 
-    private boolean isConnected() {
+    boolean isConnectedToOpenshiftServer() {
         return connection != null;
     }
 
-    /**
-     * @param applicationName
-     * @param namespace
-     * @param connectionUrl
-     * @return
-     */
-    public int startPortForwarding(String applicationName, String namespace, String connectionUrl) {
-        final IApplication application = getApplication(applicationName, namespace);
+
+    public int startPortForwarding(String applicationName, String domainName, String connectionUrl) {
+        final IApplication application = getApplication(applicationName, domainName);
         final String sshUrl = application.getSshUrl();
-        session = getSession(sshUrl);
+        session = sessionConnector.getAndConnectSession(sshUrl, null);
 
         final List<String> rhcListPortsOutput = executeRhcListPorts(session);
 
-        ForwardablePort port = extractForwardableDatabasePort(rhcListPortsOutput, connectionUrl);
+        port = extractForwardableDatabasePort(rhcListPortsOutput, connectionUrl);
         port.startPortForwarding(session);
         logger.info("Started port forwarding " + port.toString());
         return port.getLocalPort();
+    }
+
+    private IApplication getApplication(String applicationName, String domainName) {
+        if (isConnectedToOpenshiftServer()) {
+            IUser user = connection.getUser();
+            if (user != null) {
+                IDomain domain = user.getDomain(domainName);
+                if (domain != null) {
+                    final IApplication application = domain.getApplicationByName(applicationName);
+                    if (application != null) {
+                        return application;
+                    }
+                }
+            }
+        }
+        throw new RuntimeException("Could not open application " + applicationName + " on domainName " + domainName);
+    }
+
+
+    private List<String> executeRhcListPorts(Session session) {
+        List<String> forwardablePorts = new ArrayList<>();
+        InputStream in = null;
+        Channel channel = null;
+        try {
+            channel = session.openChannel("exec");
+            ((ChannelExec) channel).setCommand("rhc-list-ports");
+            ((ChannelExec) channel).setPty(true);
+            in = channel.getInputStream();
+            channel.connect();
+            forwardablePorts = readLines(in);
+        } catch (Exception e) {
+            logger.warning("Error while executing rhc-list-ports on session. Reason: " + e.getMessage());
+            throw new RuntimeException("Error while executing rhc-list-ports on session", e);
+        } finally {
+            try {
+                StreamUtils.close(in);
+                if (channel != null) {
+                    channel.disconnect();
+                }
+            } catch (IOException e) {
+                logger.warning("Could not disconnect channel to ssh server");
+            }
+        }
+        return forwardablePorts;
     }
 
     private ForwardablePort extractForwardableDatabasePort(List<String> rhcListPortsOutput, String connectionUrl) {
@@ -86,37 +125,6 @@ public class OpenshiftCommunicationHandler {
         throw new RuntimeException("No forwardable port found!");
     }
 
-    private List<String> executeRhcListPorts(Session session) {
-        List<String> forwardablePorts = new ArrayList<>();
-        InputStream in = null;
-        OutputStream out = null;
-        Channel channel = null;
-        try {
-            channel = session.openChannel("exec");
-            ((ChannelExec) channel).setCommand("rhc-list-ports");
-            ((ChannelExec) channel).setPty(true);
-            in = channel.getInputStream();
-            out = channel.getOutputStream();
-            ((ChannelExec) channel).setErrStream(System.err);
-            channel.connect();
-            out.flush();
-            forwardablePorts = readLines(in);
-        } catch (Exception e) {
-            logger.warning("Error while executing rhc-list-ports on session. Reason: " + e.getMessage());
-            throw new RuntimeException("Error while executing rhc-list-ports on session", e);
-        } finally {
-            try {
-                StreamUtils.close(in);
-                StreamUtils.close(out);
-                if (channel != null) {
-                    channel.disconnect();
-                }
-            } catch (IOException e) {
-                logger.warning("Could not close channel to ssh server");
-            }
-        }
-        return forwardablePorts;
-    }
 
     public List<String> readLines(InputStream inputStream) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
@@ -129,60 +137,8 @@ public class OpenshiftCommunicationHandler {
     }
 
 
-    private Session getSession(String sshUrl) {
-        try {
-            JSch jsch = new JSch();
-            String keyFile = "~/.ssh/id_rsa";
-            Path tempFile = Paths.get(keyFile);
-            File file = tempFile.toFile();
-            jsch.addIdentity(file.getPath());
-
-            String[] userHost = extractApplicationUserAndHost(sshUrl);
-            String applicationUser = userHost[0];
-            String applicationHost = userHost[1];
-
-            Session session = jsch.getSession(applicationUser, applicationHost);
-            session.setConfig("StrictHostKeyChecking", "no");
-
-            session.connect();
-            return session;
-        } catch (JSchException e) {
-            throw new RuntimeException("Could not open session");
-        }
-    }
-
-    private String[] extractApplicationUserAndHost(String sshUrl) {
-        Objects.requireNonNull(sshUrl, "SshUrl must not be empty");
-
-        if (sshUrl.startsWith(SSH_URL_PREFIX)) {
-            sshUrl = sshUrl.substring(SSH_URL_PREFIX.length());
-        }
-        String[] userHost = sshUrl.split("@");
-        if (userHost.length != 2) {
-            throw new RuntimeException("Could not extract application user and host from sshUrl " + sshUrl);
-        }
-        return userHost;
-    }
-
-    private IApplication getApplication(String applicationName, String namespace) {
-        if (isConnected()) {
-            IUser user = connection.getUser();
-            if (user != null) {
-                IDomain domain = user.getDomain(namespace);
-                if (domain != null) {
-                    final IApplication application = domain.getApplicationByName(applicationName);
-                    if (application != null) {
-                        return application;
-                    }
-                }
-            }
-        }
-        throw new RuntimeException("Could not open application " + applicationName + " on namespace " + namespace);
-    }
-
-
-    public DatabaseData readDatabaseData(String applicationName, String namespace, String cartridgeName) {
-        final IApplication application = getApplication(applicationName, namespace);
+    public DatabaseData readDatabaseData(String applicationName, String domainName, String cartridgeName) {
+        final IApplication application = getApplication(applicationName, domainName);
         final IEmbeddedCartridge databaseCartridge = application.getEmbeddedCartridge(cartridgeName);
 
         if (databaseCartridge != null) {
@@ -198,9 +154,44 @@ public class OpenshiftCommunicationHandler {
         }
     }
 
+    public void disconnect() {
+        if (hasSession()) {
+            stopPortforwarding();
+            session.disconnect();
+            session = null;
+            logger.info("Session closed");
+        }
+
+        if (isConnectedToOpenshiftServer()) {
+            connection = null;
+        }
+    }
+
+    private void stopPortforwarding() {
+        if (hasForwardedPort()) {
+            try {
+                port.stopPortForwarding(session);
+            } catch (RuntimeException e) {
+                logger.info("Error stopping port forwarding");
+            } finally {
+                port = null;
+            }
+        }
+    }
+
+    private boolean hasForwardedPort() {
+        return port != null;
+    }
+
+    private boolean hasSession() {
+        return session != null;
+    }
 
     void setOpenshiftConnector(OpenshiftConnector connectionCreator) {
         this.connectionCreator = connectionCreator;
     }
 
+    void setSessionConnector(SessionConnector sessionConnector) {
+        this.sessionConnector = sessionConnector;
+    }
 }

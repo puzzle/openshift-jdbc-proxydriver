@@ -16,26 +16,32 @@ import java.util.regex.Pattern;
 public class ForwardablePort {
     public static final String LOCALHOST = "localhost";
 
-//    The range 49152–65535 (215+214 to 216−1)—above the registered ports—contains dynamic or private ports that cannot be registered with IANA.[174] This range is used for custom or temporary purposes and for automatic allocation of ephemeral ports.
-
     /**
      * Regex for port forwarding
      */
-    private static final Pattern REGEX_FORWARDED_PORT = Pattern.compile("([^ ]+) -> ([^:]+):(\\d+)"); // TODO from ApplicationSSHSession
-    private static final int PORT_ITERATION_RANGE = 10;
-    private static final int INITIAL_STARTING_PORT = 49152;
+    private static final Pattern REGEX_FORWARDED_PORT = Pattern.compile("([^ ]+) -> ([^:]+):(\\d+)");
+    /**
+     * The range 49152–65535 (215+214 to 216−1)—above the registered ports—contains dynamic or private ports that cannot be registered with IANA.[174] This range is used for custom or temporary purposes and for automatic allocation of ephemeral ports.
+     */
+    static final int INITIAL_STARTING_PORT = 49152;
+    /**
+     * Number of port forwarding retiry attempts with incremented port number
+     */
+    static final int PORT_ITERATION_RANGE = 10;
+
+    static final int INITIAL_LOCAL_PORT = -1;
 
 
     private final String name;
-    private final String remoteAddress;
+    private final String remoteHost;
     private final int remotePort;
 
-    private int localPort = -1;
+    private int localPort = INITIAL_LOCAL_PORT;
 
 
-    private ForwardablePort(String name, String remoteAddress, String remotePortString) {
+    private ForwardablePort(String name, String remoteHost, String remotePortString) {
         this.name = Objects.requireNonNull(name, "Name must not be null");
-        this.remoteAddress = Objects.requireNonNull(remoteAddress, "Remote address must not be null");
+        this.remoteHost = Objects.requireNonNull(remoteHost, "Remote host must not be null");
         int remotePort = Integer.parseInt(remotePortString);
         this.remotePort = Objects.requireNonNull(remotePort, "Remote port must not be null");
     }
@@ -50,11 +56,65 @@ public class ForwardablePort {
     }
 
     private static Matcher extractPortInformation(String rhcListPortsOutputLine) {
-        Matcher matcher = REGEX_FORWARDED_PORT.matcher(rhcListPortsOutputLine);
+        Matcher matcher = REGEX_FORWARDED_PORT.matcher(Objects.requireNonNull(rhcListPortsOutputLine, "rhcListPortsOutputLine must not be null"));
         if (!matcher.find() || matcher.groupCount() != 3) {
             return null;
         }
         return matcher;
+    }
+
+    public int startPortForwarding(Session session) {
+        if (!isPortforwardingStarted(session)) {
+            localPort = doPortForward(session);
+        }
+        return localPort;
+    }
+
+    boolean isPortforwardingStarted(Session session) throws OpenShiftSSHOperationException {
+        if (localPort == INITIAL_LOCAL_PORT) {
+            return false;
+        } else if (session == null || !session.isConnected()) {
+            return false;
+        }
+        try {
+            // returned format : localPort:remoteHost:remotePort
+            final String[] portForwardingL = session.getPortForwardingL();
+            final String key = getLocalPort() + ":" + getRemoteHost() + ":" + getRemotePort();
+            Arrays.sort(portForwardingL);
+            final int r = Arrays.binarySearch(portForwardingL, key);
+            return r >= 0;
+        } catch (JSchException e) {
+            throw new RuntimeException("Failed to retrieve SSH ports forwarding", e);
+        }
+    }
+
+    private int doPortForward(Session session) {
+        int startingPort = INITIAL_STARTING_PORT;
+
+        for (int i = 0; i < PORT_ITERATION_RANGE; i++) {
+            try {
+                return session.setPortForwardingL(startingPort, remoteHost, remotePort);
+            } catch (JSchException e) {
+                if (e.getCause() instanceof BindException) {
+                    // port already in use, try next port
+                    startingPort++;
+                } else {
+                    throw new RuntimeException("Failed to portforward. Reason: " + e.getMessage(), e);
+                }
+            }
+        }
+        throw new RuntimeException("All ports from " + INITIAL_STARTING_PORT + " to " + (INITIAL_STARTING_PORT + PORT_ITERATION_RANGE) + " are already in use.");
+    }
+
+    public void stopPortForwarding(Session session) {
+        if (isPortforwardingStarted(session)) {
+            try {
+                session.delPortForwardingL(localPort);
+                localPort = INITIAL_LOCAL_PORT;
+            } catch (JSchException e) {
+                throw new RuntimeException("Could not stop portforwarding", e);
+            }
+        }
     }
 
 
@@ -62,8 +122,8 @@ public class ForwardablePort {
         return name;
     }
 
-    public String getRemoteAddress() {
-        return remoteAddress;
+    public String getRemoteHost() {
+        return remoteHost;
     }
 
     public int getRemotePort() {
@@ -77,54 +137,8 @@ public class ForwardablePort {
     @Override
     public String toString() {
         return "ForwardablePort ["
-                + name + ":" + LOCALHOST + ":" + localPort + " -> " + remoteAddress
+                + name + ":" + LOCALHOST + ":" + localPort + " -> " + remoteHost
                 + ":" + remotePort + "]";
-    }
-
-
-    public int startPortForwarding(Session session) {
-        if (!isPortforwardingStarted(session)) {
-            localPort = doPortForward(session);
-        }
-        return localPort;
-    }
-
-
-    private int doPortForward(Session session) {
-        int startingPort = INITIAL_STARTING_PORT;
-
-        for (int i = 0; i < PORT_ITERATION_RANGE; i++) {
-            try {
-                return session.setPortForwardingL(startingPort, remoteAddress, remotePort);
-            } catch (JSchException e) {
-                if (e.getCause() instanceof BindException) {
-                    // port already in use, try next port
-                    startingPort++;
-                } else {
-                    throw new RuntimeException("Failed to portforward. Reason: " + e.getMessage(), e);
-                }
-            }
-        }
-        throw new RuntimeException("All ports from " + INITIAL_STARTING_PORT + " to " + INITIAL_STARTING_PORT + PORT_ITERATION_RANGE + " are already in use.");
-    }
-
-    // TODO copied from applicationportforwarding
-    private boolean isPortforwardingStarted(Session session) throws OpenShiftSSHOperationException {
-        if (session == null || !session.isConnected()) {
-            return false;
-        } else if (localPort == -1) {
-            return false;
-        }
-        try {
-            // returned format : localPort:remoteHost:remotePort
-            final String[] portForwardingL = session.getPortForwardingL();
-            final String key = getLocalPort() + ":" + getRemoteAddress() + ":" + getRemotePort();
-            Arrays.sort(portForwardingL);
-            final int r = Arrays.binarySearch(portForwardingL, key);
-            return r >= 0;
-        } catch (JSchException e) {
-            throw new RuntimeException("Failed to retrieve SSH ports forwarding", e);
-        }
     }
 
 }
