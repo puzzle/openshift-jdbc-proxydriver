@@ -34,7 +34,7 @@ Prerequisite
 ------------
 You will need to have an openshift user account and uploaded valid ssh keys where the local key is stored under "~/.ssh/id_rsa"
 
-Currently suported database driver
+Currently supported database driver
 -------------------------
 * Postgresql: org.postgresql:postgresql:9.3-1102-jdbc4
 * MySql: mysql:mysql-connector-java:5.1.9
