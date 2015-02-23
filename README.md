@@ -7,10 +7,10 @@ This driver proxy reads the db connection parameter from the applications databa
 
 Usage
 -----
-For use with a database client:
+Database client arguments:
 
-Select Driver: 
-jdbc-proxydriver-<version>-jar-with-dependencies.jar
+Proxy driver: 
+jdbc-proxydriver-[version]-jar-with-dependencies.jar
 
 Driver class:
 ch.puzzle.openshift.jdbc.OpenshiftProxyDriver
