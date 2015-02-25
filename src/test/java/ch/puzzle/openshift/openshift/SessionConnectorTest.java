@@ -9,6 +9,8 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
+import java.io.IOException;
+
 import static org.mockito.Mockito.*;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -35,7 +37,7 @@ public class SessionConnectorTest {
 
 
     @Test
-    public void getAndConnectSessionShouldUseDefaultSSHKeyFileWhenParameterIsNull() throws JSchException {
+    public void getAndConnectSessionShouldUseDefaultPrivateSSHKeyFileWhenParameterIsNull() throws JSchException {
         // given
         String sshUrl = createSshUrl(USER, HOST);
         String keyFile = null;
@@ -44,7 +46,7 @@ public class SessionConnectorTest {
         connector.getAndConnectSession(sshUrl, keyFile);
 
         // then
-        verify(jSchMock).addIdentity(SessionConnector.DEFAULT_SSH_KEY_FILE);
+        verify(jSchMock).addIdentity(SessionConnector.DEFAULT_PRIVATE_SSH_KEY_FILE);
     }
 
     private String createSshUrl(String user, String host) {

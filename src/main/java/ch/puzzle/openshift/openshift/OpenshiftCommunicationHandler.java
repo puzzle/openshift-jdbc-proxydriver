@@ -59,10 +59,10 @@ public class OpenshiftCommunicationHandler {
     }
 
 
-    public int startPortForwarding(String applicationName, String domainName, String connectionUrl) {
+    public int startPortForwarding(String applicationName, String domainName, String connectionUrl, String privateSshKeyFilePath) {
         final IApplication application = getApplication(applicationName, domainName);
         final String sshUrl = application.getSshUrl();
-        session = sessionConnector.getAndConnectSession(sshUrl, null);
+        session = sessionConnector.getAndConnectSession(sshUrl, privateSshKeyFilePath);
         port = requestForwardablePort(connectionUrl);
         port.startPortForwarding(session);
         logger.info("Started port forwarding " + port.toString());
@@ -71,7 +71,9 @@ public class OpenshiftCommunicationHandler {
 
     private ForwardablePort requestForwardablePort(String connectionUrl) {
         int timeoutInMillis = 30_000;
+        logger.info("Wakeup gear");
         executeCommand(WAKE_UP_GEAR_COMMAND, session, timeoutInMillis);
+        logger.info("Execute list-port-forward command");
         List<String> rhcListPortsOutput = executeCommand(RHC_LIST_PORT_COMMAND, session, timeoutInMillis);
         return extractForwardableDatabasePort(rhcListPortsOutput, connectionUrl);
     }

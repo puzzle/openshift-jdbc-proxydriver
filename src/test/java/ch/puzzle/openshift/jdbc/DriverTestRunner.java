@@ -16,8 +16,8 @@ public class DriverTestRunner {
     public static void main(String[] args) throws Exception {
 
         String openshiftServer = "broker.openshift-dev.puzzle.ch";
-        String application = "amwnode1";
-        String domain = "dev";
+        String application = "cv2";
+        String domain = "puzzle";
         String cartridge = "postgresql-9.2";
         String driver = "org.postgresql.Driver";
 
@@ -44,6 +44,7 @@ public class DriverTestRunner {
         Properties properties = new Properties();
         properties.put(OpenshiftProxyDriver.USER_PROPERTY_KEY, openshiftUser);
         properties.put(OpenshiftProxyDriver.PASSWORD_PROPERTY_KEY, openshiftPassword);
+        properties.put(OpenshiftProxyDriver.SSH_PRIVATE_KEY_PROPERTY_KEY, "~/.ssh/id_rsa");
         return properties;
     }
 

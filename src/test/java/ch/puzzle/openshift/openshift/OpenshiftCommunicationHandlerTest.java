@@ -79,7 +79,7 @@ public class OpenshiftCommunicationHandlerTest {
         assertFalse(communicator.isConnectedToOpenshiftServer());
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL, null);
     }
 
     @Test(expected = RuntimeException.class)
@@ -89,7 +89,7 @@ public class OpenshiftCommunicationHandlerTest {
         when(connectionMock.getUser()).thenReturn(null);
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL, null);
     }
 
 
@@ -110,7 +110,7 @@ public class OpenshiftCommunicationHandlerTest {
         when(userMock.getDomain(DOMAIN_NAME)).thenReturn(null);
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL, null);
     }
 
     @Test(expected = RuntimeException.class)
@@ -120,7 +120,7 @@ public class OpenshiftCommunicationHandlerTest {
         mockGetApplicationFor(null);
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL, null);
     }
 
     @Test
@@ -134,10 +134,25 @@ public class OpenshiftCommunicationHandlerTest {
         when(applicationMock.getSshUrl()).thenReturn(sshUrl);
 
         // when
-        startPortForwardingAcceptingMockException();
+        startPortForwardingAcceptingMockException(null);
 
         // then
         verify(sessionConnectorMock).getAndConnectSession(sshUrl, null);
+    }
+
+    @Test
+    public void startPortForwardingShouldStartSshSessionUsingSshKeyPath() {
+        // given
+        mockConnectToOpenshift();
+        IApplication applicationMock = mock(IApplication.class);
+        mockGetApplicationFor(applicationMock);
+        String sshKeyPath = "sshKeyFilePath";
+
+        // when
+        startPortForwardingAcceptingMockException(sshKeyPath);
+
+        // then
+        verify(sessionConnectorMock).getAndConnectSession(anyString(), eq(sshKeyPath));
     }
 
     private void mockGetApplicationFor(IApplication applicationMock) {
@@ -160,7 +175,7 @@ public class OpenshiftCommunicationHandlerTest {
         when(sessionConnectorMock.getAndConnectSession(anyString(), anyString())).thenReturn(sessionMock);
 
         // when
-        startPortForwardingAcceptingMockException();
+        startPortForwardingAcceptingMockException(null);
 
         // then
         verify(sessionMock).openChannel("exec");
@@ -178,7 +193,7 @@ public class OpenshiftCommunicationHandlerTest {
         when(channelMock.getInputStream()).thenReturn(in);
 
         // when
-        startPortForwardingAcceptingMockException();
+        startPortForwardingAcceptingMockException(null);
 
         // then
         verify(channelMock).setCommand(OpenshiftCommunicationHandler.RHC_LIST_PORT_COMMAND);
@@ -196,7 +211,7 @@ public class OpenshiftCommunicationHandlerTest {
         when(channelMock.getInputStream()).thenReturn(in);
 
         // when
-        startPortForwardingAcceptingMockException();
+        startPortForwardingAcceptingMockException(null);
 
         // then
         verify(channelMock).setCommand(OpenshiftCommunicationHandler.WAKE_UP_GEAR_COMMAND);
@@ -213,7 +228,7 @@ public class OpenshiftCommunicationHandlerTest {
         when(sessionMock.openChannel(anyString())).thenReturn(channelMock);
 
         // when
-        startPortForwardingAcceptingMockException();
+        startPortForwardingAcceptingMockException(null);
 
         // then
         verify(channelMock).getInputStream();
@@ -232,7 +247,7 @@ public class OpenshiftCommunicationHandlerTest {
         when(channelMock.getInputStream()).thenThrow(new RuntimeException("Exception on inputstream"));
 
         // when
-        startPortForwardingAcceptingMockException();
+        startPortForwardingAcceptingMockException(null);
 
         // then
         verify(channelMock).disconnect();
@@ -249,12 +264,12 @@ public class OpenshiftCommunicationHandlerTest {
         when(channelMock.getInputStream()).thenThrow(new RuntimeException("Exception on inputstream"));
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL, null);
     }
 
-    private void startPortForwardingAcceptingMockException() {
+    private void startPortForwardingAcceptingMockException(String sshKeyPath) {
         try {
-            communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
+            communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL, sshKeyPath);
         } catch (RuntimeException e) {
             // exception thrown because not everything is mocked!
         }
@@ -268,7 +283,7 @@ public class OpenshiftCommunicationHandlerTest {
         mockExecuteRhcListPortCommand("Any arbitary not valid command line output");
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL, null);
     }
 
     @Test(expected = RuntimeException.class)
@@ -279,7 +294,7 @@ public class OpenshiftCommunicationHandlerTest {
         mockExecuteRhcListPortCommand("");
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL, null);
     }
 
     @Test(expected = RuntimeException.class)
@@ -295,7 +310,7 @@ public class OpenshiftCommunicationHandlerTest {
         mockExecuteRhcListPortCommand(validRhcListPortOutputLine);
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl, null);
     }
 
     @Test
@@ -313,7 +328,7 @@ public class OpenshiftCommunicationHandlerTest {
         mockExecuteRhcListPortCommand(validRhcListPortOutputLine);
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl, null);
 
         // then
         verify(sessionMock).setPortForwardingL(anyInt(), eq(host), eq(port));
@@ -334,7 +349,7 @@ public class OpenshiftCommunicationHandlerTest {
         mockExecuteRhcListPortCommand("invalid commandline to be ignored", validRhcListPortOutputLine);
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl, null);
 
         // then
         verify(sessionMock).setPortForwardingL(anyInt(), eq(host), eq(port));
@@ -358,7 +373,7 @@ public class OpenshiftCommunicationHandlerTest {
         mockExecuteRhcListPortCommand(firstValidRhcListPortOutputLine, secondValidRhcListPortOutputLine);
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl, null);
 
         // then
         verify(sessionMock).setPortForwardingL(anyInt(), eq(firstHost), eq(port));
@@ -380,7 +395,7 @@ public class OpenshiftCommunicationHandlerTest {
         when(sessionMock.setPortForwardingL(anyInt(), anyString(), anyInt())).thenReturn(localPortReturnedByPortForwardingL);
 
         // when
-        final int portForwarding = communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
+        final int portForwarding = communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl, null);
 
         // then
         assertEquals(localPortReturnedByPortForwardingL, portForwarding);
@@ -401,9 +416,11 @@ public class OpenshiftCommunicationHandlerTest {
         when(sessionMock.setPortForwardingL(anyInt(), anyString(), anyInt())).thenThrow(new RuntimeException("Exception thrown by portforwarding"));
 
         // when
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl, null);
 
     }
+
+    // TODO add test with keyfile
 
     private String createValidOutputline(String name, String remoteHost, String remotePortString) {
         return name + " -> " + remoteHost + ":" + remotePortString;
@@ -631,7 +648,7 @@ public class OpenshiftCommunicationHandlerTest {
         int localPortReturnedByPortForwardingL = 987654;
         when(sessionMock.setPortForwardingL(anyInt(), anyString(), anyInt())).thenReturn(localPortReturnedByPortForwardingL);
 
-        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
+        communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl, null);
     }
 
     private class InputStreamAnswer implements Answer<InputStream> {

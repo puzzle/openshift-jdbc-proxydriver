@@ -22,11 +22,13 @@ public class OpenshiftProxyDriver implements Driver {
 
     static final String USER_PROPERTY_KEY = "user";
     static final String PASSWORD_PROPERTY_KEY = "password";
+    static final String SSH_PRIVATE_KEY_PROPERTY_KEY = "privateSshKeyFilePath";
 
     private Logger logger = Logger.getLogger(OpenshiftProxyDriver.class.getName());
 
     private String openshiftUser;
     private String openshiftPassword;
+    private String privateSshKeyFilePath;
     private String openshiftServer;
     private String applicationName;
     private String domain;
@@ -58,7 +60,7 @@ public class OpenshiftProxyDriver implements Driver {
     public Connection connect(String url, Properties info) throws SQLException {
         logger.info("proxy connection request to " + url);
         verifyUrlAndExtractUrlParameters(url);
-        verifyAndExtractUserAndPasswordProperties(info);
+        verifyAndExtractProperties(info);
 
         try {
             communicator.connect(openshiftServer, openshiftUser, openshiftPassword);
@@ -66,7 +68,7 @@ public class OpenshiftProxyDriver implements Driver {
             int port;
             if (!hasForwardedPortParameter()) {
                 logger.info("Start port forwarding");
-                port = communicator.startPortForwarding(applicationName, domain, databaseData.getConnectionUrl());
+                port = communicator.startPortForwarding(applicationName, domain, databaseData.getConnectionUrl(), privateSshKeyFilePath);
             } else {
                 logger.info("Use external portforwarding on port " + externalForwardedPort);
                 port = externalForwardedPort;
@@ -101,13 +103,18 @@ public class OpenshiftProxyDriver implements Driver {
         }
     }
 
-    private void verifyAndExtractUserAndPasswordProperties(Properties info) throws SQLException {
+    private void verifyAndExtractProperties(Properties info) throws SQLException {
         if (info == null) {
             throw new SQLException("No properties set. At least user and password must be set!");
         }
 
         openshiftUser = info.getProperty(USER_PROPERTY_KEY);
         openshiftPassword = info.getProperty(PASSWORD_PROPERTY_KEY);
+        if (info.containsKey(SSH_PRIVATE_KEY_PROPERTY_KEY)) {
+            privateSshKeyFilePath = info.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY);
+        } else {
+            privateSshKeyFilePath = null;
+        }
 
         if (openshiftUser == null || openshiftUser.isEmpty()
                 || openshiftPassword == null || openshiftPassword.isEmpty()) {
@@ -241,18 +248,25 @@ public class OpenshiftProxyDriver implements Driver {
      */
     @Override
     public DriverPropertyInfo[] getPropertyInfo(String url, Properties properties) throws SQLException {
-        DriverPropertyInfo adriverpropertyinfo[] = new DriverPropertyInfo[2];
+        DriverPropertyInfo driverPropertyInfos[] = new DriverPropertyInfo[3];
         DriverPropertyInfo driverpropertyinfo = new DriverPropertyInfo(USER_PROPERTY_KEY, null);
         driverpropertyinfo.value = properties.getProperty(USER_PROPERTY_KEY);
         driverpropertyinfo.description = "Openshift user";
         driverpropertyinfo.required = true;
-        adriverpropertyinfo[0] = driverpropertyinfo;
+        driverPropertyInfos[0] = driverpropertyinfo;
+
         driverpropertyinfo = new DriverPropertyInfo(PASSWORD_PROPERTY_KEY, null);
         driverpropertyinfo.value = properties.getProperty(PASSWORD_PROPERTY_KEY);
         driverpropertyinfo.description = "Openshift password";
         driverpropertyinfo.required = true;
-        adriverpropertyinfo[1] = driverpropertyinfo;
-        return adriverpropertyinfo;
+        driverPropertyInfos[1] = driverpropertyinfo;
+
+        driverpropertyinfo = new DriverPropertyInfo(SSH_PRIVATE_KEY_PROPERTY_KEY, null);
+        driverpropertyinfo.value = properties.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY);
+        driverpropertyinfo.description = "Absolute file path of private ssh key";
+        driverpropertyinfo.required = false;
+        driverPropertyInfos[2] = driverpropertyinfo;
+        return driverPropertyInfos;
     }
 
     /**
