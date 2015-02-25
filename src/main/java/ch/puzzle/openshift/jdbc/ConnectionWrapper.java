@@ -17,7 +17,7 @@ public class ConnectionWrapper {
     }
 
     /**
-     * Tries to establish a (wrapped) connection to to the registered driver
+     * Tries to establish a (wrapped) connection to the registered driver
      *
      * @see java.sql.DriverManager#getConnection(String, java.util.Properties)
      */

@@ -15,10 +15,13 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.mockito.stubbing.Answer;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
 import static org.junit.Assert.*;
 import static org.mockito.Matchers.anyString;
@@ -164,19 +167,39 @@ public class OpenshiftCommunicationHandlerTest {
     }
 
     @Test
-    public void startPortForwardingOnExecuteRhcListPortsShouldInvokeRhcListPortsChannelExecCommand() throws JSchException, IOException {
+    public void startPortForwardingOnExecuteRhcListPortsCommandShouldInvokeRhcListPortsChannelExecCommand() throws JSchException, IOException {
         // given
         mockConnectToOpenshift();
         mockGetApplication();
         when(sessionConnectorMock.getAndConnectSession(anyString(), anyString())).thenReturn(sessionMock);
         ChannelExec channelMock = mock(ChannelExec.class);
         when(sessionMock.openChannel(anyString())).thenReturn(channelMock);
+        ByteArrayInputStream in = new ByteArrayInputStream("".getBytes());
+        when(channelMock.getInputStream()).thenReturn(in);
 
         // when
         startPortForwardingAcceptingMockException();
 
         // then
-        verify(channelMock).setCommand("rhc-list-ports");
+        verify(channelMock).setCommand(OpenshiftCommunicationHandler.RHC_LIST_PORT_COMMAND);
+    }
+
+    @Test
+    public void startPortForwardingOnExecuteWakeUpGearCommandShouldInvokeWakeUpChannelExecCommand() throws JSchException, IOException {
+        // given
+        mockConnectToOpenshift();
+        mockGetApplication();
+        when(sessionConnectorMock.getAndConnectSession(anyString(), anyString())).thenReturn(sessionMock);
+        ChannelExec channelMock = mock(ChannelExec.class);
+        when(sessionMock.openChannel(anyString())).thenReturn(channelMock);
+        ByteArrayInputStream in = new ByteArrayInputStream("".getBytes());
+        when(channelMock.getInputStream()).thenReturn(in);
+
+        // when
+        startPortForwardingAcceptingMockException();
+
+        // then
+        verify(channelMock).setCommand(OpenshiftCommunicationHandler.WAKE_UP_GEAR_COMMAND);
     }
 
 
@@ -194,7 +217,7 @@ public class OpenshiftCommunicationHandlerTest {
 
         // then
         verify(channelMock).getInputStream();
-        verify(channelMock).connect();
+        verify(channelMock).connect(anyInt());
         verify(channelMock).disconnect();
     }
 
@@ -242,7 +265,7 @@ public class OpenshiftCommunicationHandlerTest {
         // given
         mockConnectToOpenshift();
         mockGetApplication();
-        mockExecuteRhcListPorts("Any arbitary not valid command line output");
+        mockExecuteRhcListPortCommand("Any arbitary not valid command line output");
 
         // when
         communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
@@ -253,7 +276,7 @@ public class OpenshiftCommunicationHandlerTest {
         // given
         mockConnectToOpenshift();
         mockGetApplication();
-        mockExecuteRhcListPorts("");
+        mockExecuteRhcListPortCommand("");
 
         // when
         communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, CONNECTION_URL);
@@ -269,7 +292,7 @@ public class OpenshiftCommunicationHandlerTest {
         String connectionUrl = "connection URL does not contains port service name";
         assertFalse(connectionUrl.contains(portServiceName));
 
-        mockExecuteRhcListPorts(validRhcListPortOutputLine);
+        mockExecuteRhcListPortCommand(validRhcListPortOutputLine);
 
         // when
         communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
@@ -287,7 +310,7 @@ public class OpenshiftCommunicationHandlerTest {
         String connectionUrl = portServiceName + " service name is within the connection URL";
         assertTrue(connectionUrl.contains(portServiceName));
 
-        mockExecuteRhcListPorts(validRhcListPortOutputLine);
+        mockExecuteRhcListPortCommand(validRhcListPortOutputLine);
 
         // when
         communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
@@ -308,7 +331,7 @@ public class OpenshiftCommunicationHandlerTest {
         String connectionUrl = portServiceName + " service name is within the connection URL";
         assertTrue(connectionUrl.contains(portServiceName));
 
-        mockExecuteRhcListPorts("invalid commandline to be ignored", validRhcListPortOutputLine);
+        mockExecuteRhcListPortCommand("invalid commandline to be ignored", validRhcListPortOutputLine);
 
         // when
         communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
@@ -332,7 +355,7 @@ public class OpenshiftCommunicationHandlerTest {
         String secondHost = "host";
         String secondValidRhcListPortOutputLine = createValidOutputline(portServiceName, secondHost, String.valueOf(port));
 
-        mockExecuteRhcListPorts(firstValidRhcListPortOutputLine, secondValidRhcListPortOutputLine);
+        mockExecuteRhcListPortCommand(firstValidRhcListPortOutputLine, secondValidRhcListPortOutputLine);
 
         // when
         communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
@@ -351,7 +374,7 @@ public class OpenshiftCommunicationHandlerTest {
         String validRhcListPortOutputLine = createValidOutputline(portServiceName, "host", "1234");
         String connectionUrl = portServiceName + " service name is within the connection URL";
         assertTrue(connectionUrl.contains(portServiceName));
-        mockExecuteRhcListPorts("invalid commandline to be ignored", validRhcListPortOutputLine);
+        mockExecuteRhcListPortCommand("invalid commandline to be ignored", validRhcListPortOutputLine);
 
         int localPortReturnedByPortForwardingL = 987654;
         when(sessionMock.setPortForwardingL(anyInt(), anyString(), anyInt())).thenReturn(localPortReturnedByPortForwardingL);
@@ -373,7 +396,7 @@ public class OpenshiftCommunicationHandlerTest {
         String validRhcListPortOutputLine = createValidOutputline(portServiceName, "host", "1234");
         String connectionUrl = portServiceName + " service name is within the connection URL";
         assertTrue(connectionUrl.contains(portServiceName));
-        mockExecuteRhcListPorts("invalid commandline to be ignored", validRhcListPortOutputLine);
+        mockExecuteRhcListPortCommand("invalid commandline to be ignored", validRhcListPortOutputLine);
 
         when(sessionMock.setPortForwardingL(anyInt(), anyString(), anyInt())).thenThrow(new RuntimeException("Exception thrown by portforwarding"));
 
@@ -387,22 +410,11 @@ public class OpenshiftCommunicationHandlerTest {
     }
 
 
-    private void mockExecuteRhcListPorts(String... rhcListPortOutputLines) throws JSchException, IOException {
-        String rhcListPortOutputLine = "";
-        for (String line : rhcListPortOutputLines) {
-            rhcListPortOutputLine += line + COMMANDLINE_NEWLINE_CHAR;
-        }
-        if (rhcListPortOutputLine.endsWith(COMMANDLINE_NEWLINE_CHAR)) {
-            rhcListPortOutputLine = rhcListPortOutputLine.substring(0, rhcListPortOutputLine.length() - COMMANDLINE_NEWLINE_CHAR.length());
-        }
-
+    private void mockExecuteRhcListPortCommand(String... rhcListPortOutputLines) throws JSchException, IOException {
         when(sessionConnectorMock.getAndConnectSession(anyString(), anyString())).thenReturn(sessionMock);
         ChannelExec channelMock = mock(ChannelExec.class);
-
         when(sessionMock.openChannel(anyString())).thenReturn(channelMock);
-        ByteArrayInputStream in = new ByteArrayInputStream(rhcListPortOutputLine.getBytes());
-
-        when(channelMock.getInputStream()).thenReturn(in);
+        when(channelMock.getInputStream()).thenAnswer(new InputStreamAnswer(rhcListPortOutputLines));
     }
 
 
@@ -471,10 +483,6 @@ public class OpenshiftCommunicationHandlerTest {
         readDatabaseDataAcceptingMockException();
 
         // then
-        verify(cartridgePropertiesMock).getProperty(OpenshiftCommunicationHandler.USERNAME_KEY);
-    }
-
-    private void xy(String property, CartridgeResourceProperties cartridgePropertiesMock) {
         verify(cartridgePropertiesMock).getProperty(OpenshiftCommunicationHandler.USERNAME_KEY);
     }
 
@@ -609,7 +617,7 @@ public class OpenshiftCommunicationHandlerTest {
         verify(sessionMock).disconnect();
     }
 
-    private void connectAndStartPortForwarding() throws IOException, JSchException{
+    private void connectAndStartPortForwarding() throws IOException, JSchException {
         mockConnectToOpenshift();
         mockGetApplication();
         when(sessionConnectorMock.getAndConnectSession(anyString(), anyString())).thenReturn(sessionMock);
@@ -618,12 +626,37 @@ public class OpenshiftCommunicationHandlerTest {
         String validRhcListPortOutputLine = createValidOutputline(portServiceName, "host", "1234");
         String connectionUrl = portServiceName + " service name is within the connection URL";
         assertTrue(connectionUrl.contains(portServiceName));
-        mockExecuteRhcListPorts("invalid commandline to be ignored", validRhcListPortOutputLine);
+        mockExecuteRhcListPortCommand(validRhcListPortOutputLine);
 
         int localPortReturnedByPortForwardingL = 987654;
         when(sessionMock.setPortForwardingL(anyInt(), anyString(), anyInt())).thenReturn(localPortReturnedByPortForwardingL);
 
         communicator.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, connectionUrl);
+    }
+
+    private class InputStreamAnswer implements Answer<InputStream> {
+        String rhcListPortOutputLine;
+
+        public InputStreamAnswer(String[] rhcListPortOutputLines) {
+            this.rhcListPortOutputLine = createOutputLine(rhcListPortOutputLines);
+        }
+
+        @Override
+        public InputStream answer(InvocationOnMock invocationOnMock) throws Throwable {
+            return new ByteArrayInputStream(rhcListPortOutputLine.getBytes());
+        }
+
+        private String createOutputLine(String[] rhcListPortOutputLines) {
+            String rhcListPortOutputLine = "";
+            for (String line : rhcListPortOutputLines) {
+                rhcListPortOutputLine += line + COMMANDLINE_NEWLINE_CHAR;
+            }
+            if (rhcListPortOutputLine.endsWith(COMMANDLINE_NEWLINE_CHAR)) {
+                rhcListPortOutputLine = rhcListPortOutputLine.substring(0, rhcListPortOutputLine.length() - COMMANDLINE_NEWLINE_CHAR.length());
+            }
+            return rhcListPortOutputLine;
+        }
+
     }
 
 }

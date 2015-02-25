@@ -1,6 +1,5 @@
 package ch.puzzle.openshift.openshift;
 
-import com.jcraft.jsch.Channel;
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.Session;
 import com.openshift.client.IApplication;
@@ -28,6 +27,9 @@ public class OpenshiftCommunicationHandler {
     static final String PASSWORD_KEY = "password";
     static final String DATABASE_NAME_KEY = "database_name";
     static final String CONNECTION_URL_KEY = "connection_url";
+
+    static final String WAKE_UP_GEAR_COMMAND = "curl $OPENSHIFT_GEAR_DNS > /dev/null 2>&1";
+    static final String RHC_LIST_PORT_COMMAND = "rhc-list-ports";
 
 
     private Logger logger = Logger.getLogger(OpenshiftCommunicationHandler.class.getName());
@@ -61,14 +63,19 @@ public class OpenshiftCommunicationHandler {
         final IApplication application = getApplication(applicationName, domainName);
         final String sshUrl = application.getSshUrl();
         session = sessionConnector.getAndConnectSession(sshUrl, null);
-
-        final List<String> rhcListPortsOutput = executeRhcListPorts(session);
-
-        port = extractForwardableDatabasePort(rhcListPortsOutput, connectionUrl);
+        port = requestForwardablePort(connectionUrl);
         port.startPortForwarding(session);
         logger.info("Started port forwarding " + port.toString());
         return port.getLocalPort();
     }
+
+    private ForwardablePort requestForwardablePort(String connectionUrl) {
+        int timeoutInMillis = 30_000;
+        executeCommand(WAKE_UP_GEAR_COMMAND, session, timeoutInMillis);
+        List<String> rhcListPortsOutput = executeCommand(RHC_LIST_PORT_COMMAND, session, timeoutInMillis);
+        return extractForwardableDatabasePort(rhcListPortsOutput, connectionUrl);
+    }
+
 
     private IApplication getApplication(String applicationName, String domainName) {
         if (isConnectedToOpenshiftServer()) {
@@ -86,17 +93,17 @@ public class OpenshiftCommunicationHandler {
         throw new RuntimeException("Could not open application " + applicationName + " on domainName " + domainName);
     }
 
-
-    private List<String> executeRhcListPorts(Session session) {
+    private List<String> executeCommand(String command, Session session, int timeout) {
         List<String> forwardablePorts = new ArrayList<>();
         InputStream in = null;
-        Channel channel = null;
+        ChannelExec channel = null;
         try {
-            channel = session.openChannel("exec");
-            ((ChannelExec) channel).setCommand("rhc-list-ports");
-            ((ChannelExec) channel).setPty(true);
+            channel = (ChannelExec) session.openChannel("exec");
+            channel.setCommand(command);
+            channel.setPty(true);
             in = channel.getInputStream();
-            channel.connect();
+            channel.connect(timeout);
+
             forwardablePorts = readLines(in);
         } catch (Exception e) {
             logger.warning("Error while executing rhc-list-ports on session. Reason: " + e.getMessage());
@@ -115,14 +122,25 @@ public class OpenshiftCommunicationHandler {
     }
 
     private ForwardablePort extractForwardableDatabasePort(List<String> rhcListPortsOutput, String connectionUrl) {
+        boolean hasValidPortOutput = false;
         for (String line : rhcListPortsOutput) {
             ForwardablePort port = ForwardablePort.createForValidRhcListPortsOutputLine(line);
 
-            if (port != null && connectionUrl.startsWith(port.getName())) {
-                return port;
+            if (port != null) {
+                hasValidPortOutput = true;
+                if (connectionUrl.startsWith(port.getName())) {
+                    return port;
+                } else {
+                    logger.info("Output line " + line + " is not matching the port service");
+                }
             }
         }
-        throw new RuntimeException("No forwardable port found!");
+
+        if (hasValidPortOutput) {
+            throw new RuntimeException("No forwardable port found matching the required service defined by " + connectionUrl);
+        } else {
+            throw new RuntimeException("No forwardable port found!");
+        }
     }
 
 
