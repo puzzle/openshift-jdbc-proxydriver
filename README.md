@@ -24,18 +24,26 @@ jdbc:openshiftproxy://[serverURL]/[app]?domain=[domain]&cartridge=[cartridge]&dr
 * driver: driver class for database type (ex. org.postgresql.Driver)
 * using the optional argument: &externalforwardedport=[Port] will try to connect to the given port. In this case the proxy driver does not do any port forwarding!
 
-User name:
-OpenShift Online user account.
+Mandatory properties:
 
-Password:
-OpenShift Online account password. 
+* User: OpenShift Online user account.
+* Password: OpenShift Online account password.
+
+Optional properties:
+* privateSshKeyFilePath: Absolute file path of private ssh key
+If this property is not set then the key stored under "~/.ssh/id_rsa" is used by default
 
 Prerequisite
 ------------
-You will need to have an openshift user account and uploaded valid ssh keys where the local key is stored under "~/.ssh/id_rsa"
+You will need to have an openshift user account and uploaded valid ssh keys.
 
 Currently supported database driver
 -------------------------
 * Postgresql: org.postgresql:postgresql:9.3-1102-jdbc4
 * MySql: mysql:mysql-connector-java:5.1.9
+
+
+Development/Testrunner
+----------------------
+For runing the proxy driver use "ch.puzzle.openshift.jdbc.DriverTestRunner" and define vm arguments -DopenshiftUser=<openshiftuser> -DopenshiftUserPassword=<password> within the runconfiguration
 
