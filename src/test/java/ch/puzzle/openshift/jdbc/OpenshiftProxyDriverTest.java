@@ -489,4 +489,22 @@ public class OpenshiftProxyDriverTest {
         assertTrue(isUrlAccepted);
     }
 
+    @Test
+    public void onGetMajorVersionShouldReturnValueDefinedInConstant() throws SQLException {
+        // when
+        final int majorVersion = proxy.getMajorVersion();
+
+        // then
+        assertEquals(OpenshiftProxyDriver.MAJOR_VERSION, majorVersion);
+    }
+
+    @Test
+    public void onGetMinorVersionShouldReturnValueDefinedInConstant() throws SQLException {
+        // when
+        final int minorVersion = proxy.getMinorVersion();
+
+        // then
+        assertEquals(OpenshiftProxyDriver.MINOR_VERSION, minorVersion);
+    }
+
 }

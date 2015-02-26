@@ -40,6 +40,9 @@ public class OpenshiftProxyDriver implements Driver {
     static final String PASSWORD_PROPERTY_KEY = "password";
     static final String SSH_PRIVATE_KEY_PROPERTY_KEY = "privateSshKeyFilePath";
 
+    static final int MAJOR_VERSION = 1;
+    static final int MINOR_VERSION = 0;
+
     private Logger logger = Logger.getLogger(OpenshiftProxyDriver.class.getName());
 
     private String openshiftUser;
@@ -284,7 +287,7 @@ public class OpenshiftProxyDriver implements Driver {
      */
     @Override
     public int getMajorVersion() {
-        return 1;
+        return MAJOR_VERSION;
     }
 
     /**
@@ -292,7 +295,7 @@ public class OpenshiftProxyDriver implements Driver {
      */
     @Override
     public int getMinorVersion() {
-        return 0;
+        return MINOR_VERSION;
     }
 
     @Override
