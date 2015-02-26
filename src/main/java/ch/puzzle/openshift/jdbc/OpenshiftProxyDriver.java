@@ -250,13 +250,7 @@ public class OpenshiftProxyDriver implements Driver {
      */
     @Override
     public boolean acceptsURL(String url) throws SQLException {
-        // TODO  should test url prefix for returning result and if the requested properties are not set then a exception will be thrown???
-        return url != null
-                && url.regionMatches(true, 0, URL_PREFIX, 0, URL_PREFIX.length())
-                // TODO ab hier in verify auslagern!
-                && url.contains(DOMAIN_PARAMETER_PREFIX)
-                && url.contains(CARTRIDGE_PARAMETER_PREFIX)
-                && url.contains(DRIVER_PARAMETER_PREFIX);
+        return url != null && url.regionMatches(true, 0, URL_PREFIX, 0, URL_PREFIX.length());
     }
 
     /**

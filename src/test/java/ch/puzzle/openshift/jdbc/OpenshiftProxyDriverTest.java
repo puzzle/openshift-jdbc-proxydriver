@@ -29,8 +29,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 import java.sql.SQLException;
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Matchers.contains;
@@ -442,6 +441,52 @@ public class OpenshiftProxyDriverTest {
 
         // then
         verify(communicatorMock).disconnect();
+    }
+
+    @Test
+    public void onAcceptsURLShouldReturnFalseWhenUrlWithoutProxyDriverPrefix() throws SQLException {
+        // given
+        String connectionUrl = createConnectionUrlWithoutPortForwardParameter("anyStringOtherThanPrefix", OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+
+        // when
+        final boolean isUrlAccepted = proxy.acceptsURL(connectionUrl);
+
+        // then
+        assertFalse(isUrlAccepted);
+    }
+
+    @Test
+    public void onAcceptsURLShouldReturnFalseWhenUrlIsNull() throws SQLException {
+        // given
+        String connectionUrl = null;
+        // when
+        final boolean isUrlAccepted = proxy.acceptsURL(connectionUrl);
+
+        // then
+        assertFalse(isUrlAccepted);
+    }
+
+    @Test
+    public void onAcceptsURLShouldReturnTrueWhenUrlHasValidProxyPrefixAndValidParameter() throws SQLException {
+        // given
+        String connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+
+        // when
+        final boolean isUrlAccepted = proxy.acceptsURL(connectionUrl);
+
+        // then
+        assertTrue(isUrlAccepted);
+    }
+
+    @Test
+    public void onAcceptsURLShouldReturnTrueWhenUrlHasValidProxyPrefixButInvalidUrlParameter() throws SQLException {
+        // given
+        String connectionUrl = OpenshiftProxyDriver.URL_PREFIX + "invalid url parameter";
+        // when
+        final boolean isUrlAccepted = proxy.acceptsURL(connectionUrl);
+
+        // then
+        assertTrue(isUrlAccepted);
     }
 
 }
