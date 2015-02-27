@@ -401,6 +401,17 @@ public class OpenshiftProxyDriverTest {
         verify(connectionProxyMock).wrap(contains(String.valueOf(forwardedPort)), any(Properties.class));
     }
 
+    @Test(expected = SQLException.class)
+    public void onConnectShouldThrowExceptionWhenPortForwardingParameterIsSetWithInvalidValue() throws SQLException {
+        // given
+        String forwardedPort = "Invalid port number";
+        mockOpenshiftDatabaseDataResponse();
+        connectionUrl += OpenshiftProxyDriver.PARAMETER_DELIMITER + OpenshiftProxyDriver.FORWARDED_PORT_PARAMETER_PREFIX + forwardedPort;
+
+        // when
+        proxy.connect(connectionUrl, properties);
+    }
+
     @Test
     public void onConnectShouldExtractAndDelegateWithConnectionUrlUsingPort() throws SQLException {
         // given
@@ -506,5 +517,6 @@ public class OpenshiftProxyDriverTest {
         // then
         assertEquals(OpenshiftProxyDriver.MINOR_VERSION, minorVersion);
     }
+
 
 }

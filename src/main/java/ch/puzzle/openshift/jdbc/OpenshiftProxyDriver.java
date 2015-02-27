@@ -40,6 +40,13 @@ public class OpenshiftProxyDriver implements Driver {
     static final String PASSWORD_PROPERTY_KEY = "password";
     static final String SSH_PRIVATE_KEY_PROPERTY_KEY = "privateSshKeyFilePath";
 
+    static final String SERVER = "openshiftServerKey";
+    static final String APPLICATION = "applicationKey";
+    static final String DOMAIN = "domainKey";
+    static final String CARTRIDGE = "cartridgeKey";
+    static final String DRIVER = "driverKey";
+    static final String EXTERNAL_FORWARDED_PORT = "externalForwardedPortKey";
+
     static final int MAJOR_VERSION = 1;
     static final int MINOR_VERSION = 0;
 
@@ -48,12 +55,6 @@ public class OpenshiftProxyDriver implements Driver {
     private String openshiftUser;
     private String openshiftPassword;
     private String privateSshKeyFilePath;
-    private String openshiftServer;
-    private String applicationName;
-    private String domain;
-    private String cardridge;
-    private String driver;
-    private Integer externalForwardedPort;
 
     private OpenshiftCommunicationHandler communicator;
     private ConnectionWrapper connectionProxy;
@@ -70,6 +71,7 @@ public class OpenshiftProxyDriver implements Driver {
         this.connectionProxy = new ConnectionWrapper(this);
     }
 
+
     /**
      * TODO
      *
@@ -78,24 +80,50 @@ public class OpenshiftProxyDriver implements Driver {
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
         logger.info("proxy connection request to " + url);
-        verifyUrlAndExtractUrlParameters(url);
+        Properties parameter = extractProxyDriverParametersFromUrl(url);
         verifyAndExtractProperties(info);
 
         try {
-            communicator.connect(openshiftServer, openshiftUser, openshiftPassword);
-            final DatabaseData databaseData = communicator.readDatabaseData(applicationName, domain, cardridge);
+            communicator.connect(parameter.getProperty(SERVER), openshiftUser, openshiftPassword);
+            final DatabaseData databaseData = communicator.readDatabaseData(parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), parameter.getProperty(CARTRIDGE));
             int port;
-            if (!hasForwardedPortParameter()) {
+            if (!parameter.containsKey(EXTERNAL_FORWARDED_PORT)) {
                 logger.info("Start port forwarding");
-                port = communicator.startPortForwarding(applicationName, domain, databaseData.getConnectionUrl(), privateSshKeyFilePath);
+                port = communicator.startPortForwarding(parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), databaseData.getConnectionUrl(), privateSshKeyFilePath);
             } else {
-                logger.info("Use external portforwarding on port " + externalForwardedPort);
-                port = externalForwardedPort;
+                logger.info("Use external portforwarding on port " + parameter.getProperty(EXTERNAL_FORWARDED_PORT));
+                port = getIntValueOfExternalForwardedPort(parameter);
             }
 
-            return connectToDriver(port, databaseData);
+            return connectToDriver(port, databaseData, parameter.getProperty(DRIVER));
         } catch (RuntimeException e) {
             throw new SQLException("Error occurred while communicating with openshift. Reason: " + e.getMessage(), e);
+        }
+    }
+
+    private Properties extractProxyDriverParametersFromUrl(String url) throws SQLException {
+        if (acceptsURL(url)) {
+
+            final String urlWithoutProtocol = url.substring(URL_PREFIX.length());
+            final String[] serverWithAppAndArguments = urlWithoutProtocol.split("\\?");
+
+            if (serverWithAppAndArguments.length == 2) {
+
+                String serverWithApp = serverWithAppAndArguments[0];
+                String urlParameter = serverWithAppAndArguments[1];
+
+                return extractAndVerifyParameters(serverWithApp, urlParameter);
+            }
+        }
+        throw new SQLException("Invalid URL " + url);
+    }
+
+    private int getIntValueOfExternalForwardedPort(Properties parameter) throws SQLException {
+        final String port = parameter.getProperty(EXTERNAL_FORWARDED_PORT);
+        try {
+            return Integer.valueOf(port);
+        } catch (NumberFormatException e) {
+            throw new SQLException("Invalid port number " + port);
         }
     }
 
@@ -108,24 +136,11 @@ public class OpenshiftProxyDriver implements Driver {
         communicator.disconnect();
     }
 
-    private boolean hasForwardedPortParameter() {
-        return externalForwardedPort != null;
-    }
-
-
-    private void verifyUrlAndExtractUrlParameters(String url) throws SQLException {
-        if (acceptsURL(url)) {
-            readParameterFromUrl(url);
-            verifyThatAllParametersAreSet();
-        } else {
-            throw new SQLException("Invalid URL " + url);
-        }
-    }
-
     private void verifyAndExtractProperties(Properties info) throws SQLException {
         if (info == null) {
             throw new SQLException("No properties set. At least user and password must be set!");
         }
+        // TODO pass other arguments to driver
 
         openshiftUser = info.getProperty(USER_PROPERTY_KEY);
         openshiftPassword = info.getProperty(PASSWORD_PROPERTY_KEY);
@@ -141,9 +156,9 @@ public class OpenshiftProxyDriver implements Driver {
         }
     }
 
-    private Connection connectToDriver(int forwardedPort, DatabaseData connectionData) throws SQLException {
+    private Connection connectToDriver(int forwardedPort, DatabaseData connectionData, String driverClassName) throws SQLException {
         try {
-            Class.forName(driver);
+            Class.forName(driverClassName);
 
             String url = createConnectionUrl(connectionData, forwardedPort);
             Properties userPassword = createProperties(connectionData.getDbUser(), connectionData.getDbUserPassword());
@@ -152,6 +167,7 @@ public class OpenshiftProxyDriver implements Driver {
             throw new SQLException(e.getMessage());
         }
     }
+
 
     private String createConnectionUrl(DatabaseData connectionData, int forwardedPort) throws SQLException {
         String connectionUrl = connectionData.getConnectionUrl();
@@ -175,66 +191,55 @@ public class OpenshiftProxyDriver implements Driver {
     }
 
 
-    private void readParameterFromUrl(String url) {
-        final String urlWithoutProtocol = url.substring(URL_PREFIX.length());
-        final String[] serverWithAppAndParameters = urlWithoutProtocol.split("\\?");
+    private Properties extractAndVerifyParameters(String serverWithApp, String urlParameter) throws SQLException {
+        Properties properties = new Properties();
 
-        if (serverWithAppAndParameters.length == 2) {
-
-            String serverWithApp = serverWithAppAndParameters[0];
-            String urlParameter = serverWithAppAndParameters[1];
-
-            extractAndSetServerAndApp(serverWithApp);
-            extractAndSetUrlParameter(urlParameter);
-        }
-    }
-
-    private void extractAndSetServerAndApp(String serverWithApp) {
         final String[] serverAndApp = serverWithApp.split("/");
         if (serverAndApp.length == 2) {
-            openshiftServer = serverAndApp[0];
-            applicationName = serverAndApp[1];
+            properties.put(SERVER, serverAndApp[0]);
+            properties.put(APPLICATION, serverAndApp[1]);
         }
-    }
-
-    private void extractAndSetUrlParameter(String urlParameter) {
         for (String parameterValues : urlParameter.split(PARAMETER_DELIMITER)) {
+
             if (parameterValues.startsWith(DOMAIN_PARAMETER_PREFIX)) {
-                domain = parameterValues.substring(DOMAIN_PARAMETER_PREFIX.length());
+                properties.put(DOMAIN, parameterValues.substring(DOMAIN_PARAMETER_PREFIX.length()));
             }
             if (parameterValues.startsWith(CARTRIDGE_PARAMETER_PREFIX)) {
-                cardridge = parameterValues.substring(CARTRIDGE_PARAMETER_PREFIX.length());
+                properties.put(CARTRIDGE, parameterValues.substring(CARTRIDGE_PARAMETER_PREFIX.length()));
             }
             if (parameterValues.startsWith(DRIVER_PARAMETER_PREFIX)) {
-                driver = parameterValues.substring(DRIVER_PARAMETER_PREFIX.length());
+                properties.put(DRIVER, parameterValues.substring(DRIVER_PARAMETER_PREFIX.length()));
             }
             if (parameterValues.startsWith(FORWARDED_PORT_PARAMETER_PREFIX)) {
-                externalForwardedPort = Integer.valueOf(parameterValues.substring(FORWARDED_PORT_PARAMETER_PREFIX.length()));
+                properties.put(EXTERNAL_FORWARDED_PORT, parameterValues.substring(FORWARDED_PORT_PARAMETER_PREFIX.length()));
             }
         }
+
+        verifyMandatoryParameters(properties);
+        return properties;
     }
 
-    private void verifyThatAllParametersAreSet() throws SQLException {
-        StringBuilder sb = new StringBuilder("Missing parameter in URL for");
+    private void verifyMandatoryParameters(Properties properties) throws SQLException {
+        StringBuilder sb = new StringBuilder("Missing mandatory parameter in URL for");
         boolean hasMissingParameter = false;
 
-        if (!isParameterValid(openshiftServer)) {
-            sb.append(" openshiftServerUrl");
+        if (!properties.containsKey(SERVER)) {
+            sb.append(" ").append("openshiftServerUrl");
             hasMissingParameter = true;
         }
-        if (!isParameterValid(applicationName)) {
-            sb.append(" applicationName");
+        if (!properties.containsKey(APPLICATION)) {
+            sb.append(" ").append("applicationName");
             hasMissingParameter = true;
         }
-        if (!isParameterValid(domain)) {
+        if (!properties.containsKey(DOMAIN)) {
             sb.append(" ").append(DOMAIN_PARAMETER_PREFIX);
             hasMissingParameter = true;
         }
-        if (!isParameterValid(cardridge)) {
+        if (!properties.containsKey(CARTRIDGE)) {
             sb.append(" ").append(CARTRIDGE_PARAMETER_PREFIX);
             hasMissingParameter = true;
         }
-        if (!isParameterValid(driver)) {
+        if (!properties.containsKey(DRIVER)) {
             sb.append(" ").append(DRIVER_PARAMETER_PREFIX);
             hasMissingParameter = true;
         }
@@ -317,6 +322,7 @@ public class OpenshiftProxyDriver implements Driver {
     void setConnectionProxy(ConnectionWrapper connectionProxy) {
         this.connectionProxy = connectionProxy;
     }
+
 
     private static void registerDriver() {
         try {
