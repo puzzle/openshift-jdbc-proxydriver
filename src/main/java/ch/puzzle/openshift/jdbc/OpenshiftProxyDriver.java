@@ -20,6 +20,8 @@ import ch.puzzle.openshift.openshift.DatabaseData;
 import ch.puzzle.openshift.openshift.OpenshiftCommunicationHandler;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.logging.Logger;
@@ -52,10 +54,6 @@ public class OpenshiftProxyDriver implements Driver {
 
     private Logger logger = Logger.getLogger(OpenshiftProxyDriver.class.getName());
 
-    private String openshiftUser;
-    private String openshiftPassword;
-    private String privateSshKeyFilePath;
-
     private OpenshiftCommunicationHandler communicator;
     private ConnectionWrapper connectionProxy;
 
@@ -73,35 +71,48 @@ public class OpenshiftProxyDriver implements Driver {
 
 
     /**
-     * TODO
+     * TODO javadoc
      *
      * @see com.mysql.jdbc.Driver#connect(String, java.util.Properties)
      */
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
         logger.info("proxy connection request to " + url);
-        Properties parameter = extractProxyDriverParametersFromUrl(url);
-        verifyAndExtractProperties(info);
+        Properties parameter = extractAndValidateProxyDriverParametersFromUrl(url);
+        verifyUserProperties(info);
 
         try {
-            communicator.connect(parameter.getProperty(SERVER), openshiftUser, openshiftPassword);
+            communicator.connect(parameter.getProperty(SERVER), info.getProperty(USER_PROPERTY_KEY), info.getProperty(PASSWORD_PROPERTY_KEY));
             final DatabaseData databaseData = communicator.readDatabaseData(parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), parameter.getProperty(CARTRIDGE));
             int port;
             if (!parameter.containsKey(EXTERNAL_FORWARDED_PORT)) {
                 logger.info("Start port forwarding");
-                port = communicator.startPortForwarding(parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), databaseData.getConnectionUrl(), privateSshKeyFilePath);
+                port = communicator.startPortForwarding(parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), databaseData.getConnectionUrl(), info.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY));
             } else {
                 logger.info("Use external portforwarding on port " + parameter.getProperty(EXTERNAL_FORWARDED_PORT));
                 port = getIntValueOfExternalForwardedPort(parameter);
             }
 
-            return connectToDriver(port, databaseData, parameter.getProperty(DRIVER));
+            String connectionUrl = createConnectionUrl(databaseData, port);
+            Properties driverConnectionProperties = replaceUserPasswordProperties(info, databaseData.getDbUser(), databaseData.getDbUserPassword());
+
+            return connectToDriver(parameter.getProperty(DRIVER), connectionUrl, driverConnectionProperties);
         } catch (RuntimeException e) {
             throw new SQLException("Error occurred while communicating with openshift. Reason: " + e.getMessage(), e);
         }
     }
 
-    private Properties extractProxyDriverParametersFromUrl(String url) throws SQLException {
+    private Properties replaceUserPasswordProperties(Properties proxyDriverProperties, String dbUser, String dbUserPassword) throws SQLException {
+        proxyDriverProperties.remove(USER_PROPERTY_KEY);
+        proxyDriverProperties.remove(PASSWORD_PROPERTY_KEY);
+
+        proxyDriverProperties.put(USER_PROPERTY_KEY, dbUser);
+        proxyDriverProperties.put(PASSWORD_PROPERTY_KEY, dbUserPassword);
+
+        return verifyUserProperties(proxyDriverProperties);
+    }
+
+    private Properties extractAndValidateProxyDriverParametersFromUrl(String url) throws SQLException {
         if (acceptsURL(url)) {
 
             final String urlWithoutProtocol = url.substring(URL_PREFIX.length());
@@ -112,7 +123,7 @@ public class OpenshiftProxyDriver implements Driver {
                 String serverWithApp = serverWithAppAndArguments[0];
                 String urlParameter = serverWithAppAndArguments[1];
 
-                return extractAndVerifyParameters(serverWithApp, urlParameter);
+                return extractAndValidateParameters(serverWithApp, urlParameter);
             }
         }
         throw new SQLException("Invalid URL " + url);
@@ -136,33 +147,24 @@ public class OpenshiftProxyDriver implements Driver {
         communicator.disconnect();
     }
 
-    private void verifyAndExtractProperties(Properties info) throws SQLException {
-        if (info == null) {
-            throw new SQLException("No properties set. At least user and password must be set!");
-        }
-        // TODO pass other arguments to driver
+    private Properties verifyUserProperties(Properties info) throws SQLException {
 
-        openshiftUser = info.getProperty(USER_PROPERTY_KEY);
-        openshiftPassword = info.getProperty(PASSWORD_PROPERTY_KEY);
-        if (info.containsKey(SSH_PRIVATE_KEY_PROPERTY_KEY)) {
-            privateSshKeyFilePath = info.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY);
-        } else {
-            privateSshKeyFilePath = null;
-        }
+        if (info != null) {
+            String openshiftUser = info.getProperty(USER_PROPERTY_KEY);
+            String openshiftPassword = info.getProperty(PASSWORD_PROPERTY_KEY);
 
-        if (openshiftUser == null || openshiftUser.isEmpty()
-                || openshiftPassword == null || openshiftPassword.isEmpty()) {
-            throw new SQLException("Invalid properties set! At least user and password must be set!");
+            if (openshiftUser != null && !openshiftUser.isEmpty()
+                    && openshiftPassword != null && !openshiftPassword.isEmpty()) {
+                return info;
+            }
         }
+        throw new SQLException("Invalid user properties! At least user and password must be set!");
     }
 
-    private Connection connectToDriver(int forwardedPort, DatabaseData connectionData, String driverClassName) throws SQLException {
+    private Connection connectToDriver(String driverClassName, String url, Properties info) throws SQLException {
         try {
-            Class.forName(driverClassName);
-
-            String url = createConnectionUrl(connectionData, forwardedPort);
-            Properties userPassword = createProperties(connectionData.getDbUser(), connectionData.getDbUserPassword());
-            return connectionProxy.wrap(url, userPassword);
+            getDriverByClassName(driverClassName);
+            return connectionProxy.wrap(url, info);
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
         }
@@ -181,17 +183,7 @@ public class OpenshiftProxyDriver implements Driver {
         }
     }
 
-    private Properties createProperties(String dbUser, String dbUserPassword) {
-        Properties properties = new Properties();
-
-        properties.setProperty(USER_PROPERTY_KEY, dbUser);
-        properties.setProperty(PASSWORD_PROPERTY_KEY, dbUserPassword);
-
-        return properties;
-    }
-
-
-    private Properties extractAndVerifyParameters(String serverWithApp, String urlParameter) throws SQLException {
+    private Properties extractAndValidateParameters(String serverWithApp, String urlParameter) throws SQLException {
         Properties properties = new Properties();
 
         final String[] serverAndApp = serverWithApp.split("/");
@@ -215,11 +207,11 @@ public class OpenshiftProxyDriver implements Driver {
             }
         }
 
-        verifyMandatoryParameters(properties);
+        verifyExistenceOfMandatoryParameters(properties);
         return properties;
     }
 
-    private void verifyMandatoryParameters(Properties properties) throws SQLException {
+    private void verifyExistenceOfMandatoryParameters(Properties properties) throws SQLException {
         StringBuilder sb = new StringBuilder("Missing mandatory parameter in URL for");
         boolean hasMissingParameter = false;
 
@@ -266,25 +258,47 @@ public class OpenshiftProxyDriver implements Driver {
      */
     @Override
     public DriverPropertyInfo[] getPropertyInfo(String url, Properties properties) throws SQLException {
-        DriverPropertyInfo driverPropertyInfos[] = new DriverPropertyInfo[3];
-        DriverPropertyInfo driverpropertyinfo = new DriverPropertyInfo(USER_PROPERTY_KEY, null);
-        driverpropertyinfo.value = properties.getProperty(USER_PROPERTY_KEY);
+
+        List<DriverPropertyInfo> driverPropertyInfos = new ArrayList<>();
+
+        DriverPropertyInfo driverpropertyinfo = new DriverPropertyInfo(USER_PROPERTY_KEY, properties.getProperty(USER_PROPERTY_KEY));
         driverpropertyinfo.description = "Openshift user";
         driverpropertyinfo.required = true;
-        driverPropertyInfos[0] = driverpropertyinfo;
+        driverPropertyInfos.add(driverpropertyinfo);
 
-        driverpropertyinfo = new DriverPropertyInfo(PASSWORD_PROPERTY_KEY, null);
-        driverpropertyinfo.value = properties.getProperty(PASSWORD_PROPERTY_KEY);
+        driverpropertyinfo = new DriverPropertyInfo(PASSWORD_PROPERTY_KEY, properties.getProperty(PASSWORD_PROPERTY_KEY));
         driverpropertyinfo.description = "Openshift password";
         driverpropertyinfo.required = true;
-        driverPropertyInfos[1] = driverpropertyinfo;
+        driverPropertyInfos.add(driverpropertyinfo);
 
-        driverpropertyinfo = new DriverPropertyInfo(SSH_PRIVATE_KEY_PROPERTY_KEY, null);
-        driverpropertyinfo.value = properties.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY);
+        driverpropertyinfo = new DriverPropertyInfo(SSH_PRIVATE_KEY_PROPERTY_KEY, properties.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY));
         driverpropertyinfo.description = "Absolute file path of private ssh key";
-        driverpropertyinfo.required = false;
-        driverPropertyInfos[2] = driverpropertyinfo;
-        return driverPropertyInfos;
+        driverPropertyInfos.add(driverpropertyinfo);
+
+        driverPropertyInfos.addAll(getTargetDriverPropertiesWithoutUserAndPassword(url, properties));
+
+        return driverPropertyInfos.toArray(new DriverPropertyInfo[driverPropertyInfos.size()]);
+    }
+
+    private List<DriverPropertyInfo> getTargetDriverPropertiesWithoutUserAndPassword(String url, Properties properties) throws SQLException {
+        List<DriverPropertyInfo> driverPropertiesWithoutUserPassword = new ArrayList<>();
+
+        Properties parameter = extractAndValidateProxyDriverParametersFromUrl(url);
+        Driver driver = getDriverByClassName(parameter.getProperty(DRIVER));
+
+        if (driver != null) {
+            for (DriverPropertyInfo driverpropertyinfo : driver.getPropertyInfo(url, properties)) {
+                if (!isUserOrPasswordProperty(driverpropertyinfo)) {
+                    driverPropertiesWithoutUserPassword.add(driverpropertyinfo);
+                }
+            }
+        }
+
+        return driverPropertiesWithoutUserPassword;
+    }
+
+    private boolean isUserOrPasswordProperty(DriverPropertyInfo driverpropertyinfo) {
+        return USER_PROPERTY_KEY.equals(driverpropertyinfo.name) || PASSWORD_PROPERTY_KEY.equals(driverpropertyinfo.name);
     }
 
     /**
@@ -332,21 +346,19 @@ public class OpenshiftProxyDriver implements Driver {
         }
     }
 
-    protected java.sql.Driver getDriverByClassName(String className) {
+    private java.sql.Driver getDriverByClassName(String className) {
         try {
             Class<?> c = Class.forName(className);
             Object o = c.newInstance();
             if (o instanceof java.sql.Driver) {
                 return (java.sql.Driver) o;
             } else {
-                throw new RuntimeException("JDBCMetrics could cast " + className + " to java.sql.Driver");
+                throw new RuntimeException("Could not cast " + className + " to java.sql.Driver");
             }
         } catch (ClassNotFoundException e) {
-            throw new RuntimeException("JDBCMetrics could not find driver class", e);
-        } catch (InstantiationException e) {
-            throw new RuntimeException("JDBCMetrics could not instantiate driver class", e);
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException("JDBCMetrics could not instantiate driver class", e);
+            throw new RuntimeException("Could not find driver class", e);
+        } catch (InstantiationException | IllegalAccessException e) {
+            throw new RuntimeException("Could not instantiate driver class", e);
         }
     }
 }

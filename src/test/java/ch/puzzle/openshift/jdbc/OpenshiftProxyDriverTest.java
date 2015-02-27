@@ -20,14 +20,18 @@ import ch.puzzle.openshift.openshift.DatabaseData;
 import ch.puzzle.openshift.openshift.OpenshiftCommunicationHandler;
 import com.openshift.client.OpenShiftException;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
-import java.sql.SQLException;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
+import java.util.logging.Logger;
 
 import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
@@ -43,10 +47,14 @@ public class OpenshiftProxyDriverTest {
     private static final String APPLICATION_NAME = "applicationName";
     private static final String NAMESPACE_NAME = "openshiftDomainName";
     private static final String CARTRIDGE_NAME = "cartridgeName";
-    private static final String ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME = "org.postgresql.Driver";
+    private static final String ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME = "org.postgresql.Driver";
     private static final String OPENSHIFT_USER_NAME = "Username";
     private static final String OPENSHIFT_PASSWORD = "Password";
     private static final String OPENSHIFT_DB_CONNECTION_URL = "postgresql://$OPENSHIFT_POSTGRESQL_DB_HOST:$OPENSHIFT_POSTGRESQL_DB_PORT";
+
+    private static final String USER_PROPERTY = "userProperty";
+    private static final String PASSWORD_PROPERTY = "passwordProperty";
+    private static final String OTHER_DRIVER_PROPERTY = "otherDriverProperty";
 
     private Properties properties;
     private String connectionUrl;
@@ -64,7 +72,7 @@ public class OpenshiftProxyDriverTest {
         proxy.setConnectionProxy(connectionProxyMock);
 
         properties = createProperties(OPENSHIFT_USER_NAME, OPENSHIFT_PASSWORD);
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
     }
 
@@ -91,7 +99,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNotStartingWithUrlPrefix() throws SQLException {
         // given
-        String connectionUrl = createConnectionUrlWithoutPortForwardParameter("anyStringOtherThanPrefix", OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+        String connectionUrl = createConnectionUrlWithoutPortForwardParameter("anyStringOtherThanPrefix", OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -128,7 +136,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoServerIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, "", APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, "", APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -137,7 +145,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoApplicationIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, "", NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, "", NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -146,7 +154,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoNamespaceIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, "", CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, "", CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -155,7 +163,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoCartridgeIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, "", ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, "", ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -173,7 +181,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoLocalPortIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -457,7 +465,7 @@ public class OpenshiftProxyDriverTest {
     @Test
     public void onAcceptsURLShouldReturnFalseWhenUrlWithoutProxyDriverPrefix() throws SQLException {
         // given
-        String connectionUrl = createConnectionUrlWithoutPortForwardParameter("anyStringOtherThanPrefix", OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+        String connectionUrl = createConnectionUrlWithoutPortForwardParameter("anyStringOtherThanPrefix", OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         final boolean isUrlAccepted = proxy.acceptsURL(connectionUrl);
@@ -480,7 +488,7 @@ public class OpenshiftProxyDriverTest {
     @Test
     public void onAcceptsURLShouldReturnTrueWhenUrlHasValidProxyPrefixAndValidParameter() throws SQLException {
         // given
-        String connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_JDBC_DRIVER_FULL_CLASS_NAME);
+        String connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         final boolean isUrlAccepted = proxy.acceptsURL(connectionUrl);
@@ -516,6 +524,108 @@ public class OpenshiftProxyDriverTest {
 
         // then
         assertEquals(OpenshiftProxyDriver.MINOR_VERSION, minorVersion);
+    }
+
+    @Test(expected = RuntimeException.class)
+    public void onGetPropertyInfoShouldThrowExceptionWhenDriverParameterIsInvalid() throws SQLException {
+        // given
+        properties = createProperties(OPENSHIFT_USER_NAME, OPENSHIFT_PASSWORD);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, "invalidDriverName");
+
+        // when
+        proxy.getPropertyInfo(connectionUrl, properties);
+
+    }
+
+    @Ignore
+    @Test
+    public void onGetPropertyInfoShould2() throws SQLException {
+        // given
+        properties = createProperties(OPENSHIFT_USER_NAME, OPENSHIFT_PASSWORD);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
+
+        // when
+        final DriverPropertyInfo[] propertyInfo = proxy.getPropertyInfo(connectionUrl, properties);
+
+        // then
+        assertEquals(propertyInfo.length, 3);
+    }
+
+    @Ignore("TODO use testdriver class to verify properties")
+    @Test
+    public void onGetPropertyInfoShould() throws SQLException {
+        // given
+        properties = createProperties(OPENSHIFT_USER_NAME, OPENSHIFT_PASSWORD);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, "ch.puzzle.openshift.jdbc.TestDriverWithoutParameter");
+
+        // when
+        final DriverPropertyInfo[] propertyInfo = proxy.getPropertyInfo(connectionUrl, properties);
+
+        // then
+        assertEquals(propertyInfo.length, 3);
+    }
+
+    public class TestDriverWithoutParameter implements Driver {
+
+        @Override
+        public Connection connect(String url, Properties info) throws SQLException {
+            return null;
+        }
+
+        @Override
+        public boolean acceptsURL(String url) throws SQLException {
+            return false;
+        }
+
+        @Override
+        public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
+            return new DriverPropertyInfo[0];
+        }
+
+        @Override
+        public int getMajorVersion() {
+            return 0;
+        }
+
+        @Override
+        public int getMinorVersion() {
+            return 0;
+        }
+
+        @Override
+        public boolean jdbcCompliant() {
+            return false;
+        }
+
+        @Override
+        public Logger getParentLogger() throws SQLFeatureNotSupportedException {
+            return null;
+        }
+    }
+
+    public class TestDriverWithThreeParameter extends TestDriverWithoutParameter {
+
+        @Override
+        public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
+            List<DriverPropertyInfo> driverPropertyInfos = new ArrayList<>();
+
+            DriverPropertyInfo driverpropertyinfo = new DriverPropertyInfo(OpenshiftProxyDriver.USER_PROPERTY_KEY, USER_PROPERTY);
+            driverpropertyinfo.description = "Openshift user";
+            driverpropertyinfo.required = true;
+            driverPropertyInfos.add(driverpropertyinfo);
+
+            driverpropertyinfo = new DriverPropertyInfo(OpenshiftProxyDriver.PASSWORD_PROPERTY_KEY, PASSWORD_PROPERTY);
+            driverpropertyinfo.description = "Openshift password";
+            driverpropertyinfo.required = true;
+            driverPropertyInfos.add(driverpropertyinfo);
+
+            driverpropertyinfo = new DriverPropertyInfo(OTHER_DRIVER_PROPERTY, OTHER_DRIVER_PROPERTY);
+            driverPropertyInfos.add(driverpropertyinfo);
+
+            return driverPropertyInfos.toArray(new DriverPropertyInfo[driverPropertyInfos.size()]);
+        }
+
+
     }
 
 
