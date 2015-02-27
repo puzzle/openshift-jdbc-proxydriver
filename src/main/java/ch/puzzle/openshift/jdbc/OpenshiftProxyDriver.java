@@ -319,14 +319,12 @@ public class OpenshiftProxyDriver implements Driver {
 
     @Override
     public boolean jdbcCompliant() {
-        // TODO what?
         return false;
     }
 
     @Override
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
-        // TODO
-        return logger;
+        new SQLFeatureNotSupportedException();
     }
 
     void setOpenshiftCommunicator(OpenshiftCommunicationHandler communicator) {
