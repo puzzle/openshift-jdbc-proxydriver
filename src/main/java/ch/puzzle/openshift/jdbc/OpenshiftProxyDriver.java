@@ -331,4 +331,22 @@ public class OpenshiftProxyDriver implements Driver {
             throw new RuntimeException("Error registering driver", exception);
         }
     }
+
+    protected java.sql.Driver getDriverByClassName(String className) {
+        try {
+            Class<?> c = Class.forName(className);
+            Object o = c.newInstance();
+            if (o instanceof java.sql.Driver) {
+                return (java.sql.Driver) o;
+            } else {
+                throw new RuntimeException("JDBCMetrics could cast " + className + " to java.sql.Driver");
+            }
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("JDBCMetrics could not find driver class", e);
+        } catch (InstantiationException e) {
+            throw new RuntimeException("JDBCMetrics could not instantiate driver class", e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("JDBCMetrics could not instantiate driver class", e);
+        }
+    }
 }
