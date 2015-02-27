@@ -324,7 +324,7 @@ public class OpenshiftProxyDriver implements Driver {
 
     @Override
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException {
-        new SQLFeatureNotSupportedException();
+        throw new SQLFeatureNotSupportedException();
     }
 
     void setOpenshiftCommunicator(OpenshiftCommunicationHandler communicator) {
