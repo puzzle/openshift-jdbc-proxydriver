@@ -41,6 +41,7 @@ public class OpenshiftProxyDriver implements Driver {
     static final int MINOR_VERSION = 0;
 
     private Logger logger = Logger.getLogger(OpenshiftProxyDriver.class.getName());
+    // TODO verify logging
 
     private OpenshiftCommunicationHandler communicator;
     private ConnectionWrapper connectionProxy;
@@ -48,9 +49,6 @@ public class OpenshiftProxyDriver implements Driver {
     static {
         registerDriver();
     }
-
-    // TODO implement logging
-
 
     public OpenshiftProxyDriver() {
         this.communicator = new OpenshiftCommunicationHandler();
@@ -73,9 +71,9 @@ public class OpenshiftProxyDriver implements Driver {
         }
 
         try {
-            verifyUserProperties(info);
-            ProxyDriverURL proxyDriverURL = ProxyDriverURL.createValid(URL_PREFIX, url);
+            verifyUserPasswordProperties(info);
 
+            ProxyDriverURL proxyDriverURL = ProxyDriverURL.createValid(URL_PREFIX, url);
             final DatabaseData databaseData = connectToOpenshiftAndGetDatabaseData(proxyDriverURL, info);
 
             int port;
@@ -110,7 +108,7 @@ public class OpenshiftProxyDriver implements Driver {
         proxyDriverProperties.put(USER_PROPERTY_KEY, dbUser);
         proxyDriverProperties.put(PASSWORD_PROPERTY_KEY, dbUserPassword);
 
-        return verifyUserProperties(proxyDriverProperties);
+        return verifyUserPasswordProperties(proxyDriverProperties);
     }
 
 
@@ -123,14 +121,14 @@ public class OpenshiftProxyDriver implements Driver {
         communicator.disconnect();
     }
 
-    private Properties verifyUserProperties(Properties info) throws SQLException {
+    private Properties verifyUserPasswordProperties(Properties info) throws SQLException {
 
         if (info != null) {
-            String openshiftUser = info.getProperty(USER_PROPERTY_KEY);
-            String openshiftPassword = info.getProperty(PASSWORD_PROPERTY_KEY);
+            String user = info.getProperty(USER_PROPERTY_KEY);
+            String password = info.getProperty(PASSWORD_PROPERTY_KEY);
 
-            if (openshiftUser != null && !openshiftUser.isEmpty()
-                    && openshiftPassword != null && !openshiftPassword.isEmpty()) {
+            if (user != null && !user.isEmpty()
+                    && password != null && !password.isEmpty()) {
                 return info;
             }
         }
@@ -190,27 +188,31 @@ public class OpenshiftProxyDriver implements Driver {
         driverpropertyinfo.description = "Absolute file path of private ssh key";
         driverPropertyInfos.add(driverpropertyinfo);
 
-//        driverPropertyInfos.addAll(getTargetDriverPropertiesWithoutUserAndPassword(url, properties));
+        driverPropertyInfos.addAll(getTargetDriverPropertiesWithoutUserAndPassword(url, properties));
 
         return driverPropertyInfos.toArray(new DriverPropertyInfo[driverPropertyInfos.size()]);
     }
 
-//    private List<DriverPropertyInfo> getTargetDriverPropertiesWithoutUserAndPassword(String url, Properties properties) throws SQLException {
-//        List<DriverPropertyInfo> driverPropertiesWithoutUserPassword = new ArrayList<>();
-//
-//        Properties parameter = extractAndValidateProxyDriverParametersFromUrl(url);
-//        Driver driver = getDriverByClassName(parameter.getProperty(DRIVER));
-//
-//        if (driver != null) {
-//            for (DriverPropertyInfo driverpropertyinfo : driver.getPropertyInfo(url, properties)) {
-//                if (!isUserOrPasswordProperty(driverpropertyinfo)) {
-//                    driverPropertiesWithoutUserPassword.add(driverpropertyinfo);
-//                }
-//            }
-//        }
-//
-//        return driverPropertiesWithoutUserPassword;
-//    }
+    private List<DriverPropertyInfo> getTargetDriverPropertiesWithoutUserAndPassword(String url, Properties properties) throws SQLException {
+        List<DriverPropertyInfo> driverPropertiesWithoutUserPassword = new ArrayList<>();
+
+        ProxyDriverURL proxyDriverURL = ProxyDriverURL.createValid(URL_PREFIX, url);
+        final DatabaseData databaseData = connectToOpenshiftAndGetDatabaseData(proxyDriverURL, properties);
+
+        Driver driver = getDriverByClassName(proxyDriverURL.getDriver());
+
+        final String connectionUrl = createConnectionUrl(databaseData, 1);
+
+        if (driver != null) {
+            for (DriverPropertyInfo driverpropertyinfo : driver.getPropertyInfo(connectionUrl, properties)) {
+                if (!isUserOrPasswordProperty(driverpropertyinfo)) {
+                    driverPropertiesWithoutUserPassword.add(driverpropertyinfo);
+                }
+            }
+        }
+
+        return driverPropertiesWithoutUserPassword;
+    }
 
     private boolean isUserOrPasswordProperty(DriverPropertyInfo driverpropertyinfo) {
         return USER_PROPERTY_KEY.equals(driverpropertyinfo.name) || PASSWORD_PROPERTY_KEY.equals(driverpropertyinfo.name);
@@ -274,4 +276,5 @@ public class OpenshiftProxyDriver implements Driver {
             throw new RuntimeException("Could not instantiate driver class", e);
         }
     }
+
 }

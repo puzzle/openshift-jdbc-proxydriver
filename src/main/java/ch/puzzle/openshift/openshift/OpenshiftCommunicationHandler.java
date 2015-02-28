@@ -46,6 +46,7 @@ public class OpenshiftCommunicationHandler {
 
     static final String WAKE_UP_GEAR_COMMAND = "curl $OPENSHIFT_GEAR_DNS > /dev/null 2>&1";
     static final String RHC_LIST_PORT_COMMAND = "rhc-list-ports";
+    static final int COMMAND_TIMEOUT_IN_MILLIS = 90_000;
 
 
     private Logger logger = Logger.getLogger(OpenshiftCommunicationHandler.class.getName());
@@ -86,11 +87,10 @@ public class OpenshiftCommunicationHandler {
     }
 
     private ForwardablePort requestForwardablePort(String connectionUrl) {
-        int timeoutInMillis = 30_000;
         logger.info("Wakeup gear");
-        executeCommand(WAKE_UP_GEAR_COMMAND, session, timeoutInMillis);
+        executeCommand(WAKE_UP_GEAR_COMMAND, session, COMMAND_TIMEOUT_IN_MILLIS);
         logger.info("Execute list-port-forward command");
-        List<String> rhcListPortsOutput = executeCommand(RHC_LIST_PORT_COMMAND, session, timeoutInMillis);
+        List<String> rhcListPortsOutput = executeCommand(RHC_LIST_PORT_COMMAND, session, COMMAND_TIMEOUT_IN_MILLIS);
         return extractForwardableDatabasePort(rhcListPortsOutput, connectionUrl);
     }
 

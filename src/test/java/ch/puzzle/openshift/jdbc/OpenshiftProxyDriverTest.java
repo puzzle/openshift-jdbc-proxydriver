@@ -20,18 +20,17 @@ import ch.puzzle.openshift.openshift.DatabaseData;
 import ch.puzzle.openshift.openshift.OpenshiftCommunicationHandler;
 import com.openshift.client.OpenShiftException;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.sql.Connection;
+import java.sql.DriverPropertyInfo;
+import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Properties;
-import java.util.logging.Logger;
 
 import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
@@ -532,7 +531,6 @@ public class OpenshiftProxyDriverTest {
         assertEquals(OpenshiftProxyDriver.MINOR_VERSION, minorVersion);
     }
 
-    @Ignore
     @Test(expected = RuntimeException.class)
     public void onGetPropertyInfoShouldThrowExceptionWhenDriverParameterIsInvalid() throws SQLException {
         // given
@@ -544,95 +542,47 @@ public class OpenshiftProxyDriverTest {
 
     }
 
-    @Ignore
     @Test
-    public void onGetPropertyInfoShould2() throws SQLException {
+    public void onGetPropertyInfoShouldReturnPropertiesFromProxyDriver() throws SQLException {
         // given
-        properties = createProperties(OPENSHIFT_USER_NAME, OPENSHIFT_PASSWORD);
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, TestDriverWithoutProperties.class.getCanonicalName());
+        mockOpenshiftDatabaseDataResponse("dbUser", "dbPwd", "postgresql://$OPENSHIFT_POSTGRESQL_DB_HOST:$OPENSHIFT_POSTGRESQL_DB_PORT", "dbName");
 
         // when
         final DriverPropertyInfo[] propertyInfo = proxy.getPropertyInfo(connectionUrl, properties);
 
         // then
-        assertEquals(propertyInfo.length, 3);
+        assertEquals("Should contain exactly all properties set by openshiftProxyDriver", propertyInfo.length, 3);
+        assertTrue(containsProperty(propertyInfo, OpenshiftProxyDriver.USER_PROPERTY_KEY));
+        assertTrue(containsProperty(propertyInfo, OpenshiftProxyDriver.PASSWORD_PROPERTY_KEY));
+        assertTrue(containsProperty(propertyInfo, OpenshiftProxyDriver.SSH_PRIVATE_KEY_PROPERTY_KEY));
+
     }
 
-    @Ignore("TODO use testdriver class to verify properties")
+    private boolean containsProperty(DriverPropertyInfo[] propertyInfo, String propertyName) {
+        for (DriverPropertyInfo property : Arrays.asList(propertyInfo)) {
+            if (property.name.equals(propertyName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Test
-    public void onGetPropertyInfoShould() throws SQLException {
+    public void onGetPropertyInfoShouldReturnPropertiesFromProxyDriverAndAdditionalPropertyFromOriginDriver() throws SQLException {
         // given
-        properties = createProperties(OPENSHIFT_USER_NAME, OPENSHIFT_PASSWORD);
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, "ch.puzzle.openshift.jdbc.TestDriverWithoutParameter");
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, TestDriverWithUserAndPasswordAndOtherProperties.class.getCanonicalName());
+        mockOpenshiftDatabaseDataResponse("dbUser", "dbPwd", "postgresql://$OPENSHIFT_POSTGRESQL_DB_HOST:$OPENSHIFT_POSTGRESQL_DB_PORT", "dbName");
 
         // when
         final DriverPropertyInfo[] propertyInfo = proxy.getPropertyInfo(connectionUrl, properties);
 
         // then
-        assertEquals(propertyInfo.length, 3);
-    }
-
-    public class TestDriverWithoutParameter implements Driver {
-
-        @Override
-        public Connection connect(String url, Properties info) throws SQLException {
-            return null;
-        }
-
-        @Override
-        public boolean acceptsURL(String url) throws SQLException {
-            return false;
-        }
-
-        @Override
-        public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
-            return new DriverPropertyInfo[0];
-        }
-
-        @Override
-        public int getMajorVersion() {
-            return 0;
-        }
-
-        @Override
-        public int getMinorVersion() {
-            return 0;
-        }
-
-        @Override
-        public boolean jdbcCompliant() {
-            return false;
-        }
-
-        @Override
-        public Logger getParentLogger() throws SQLFeatureNotSupportedException {
-            return null;
-        }
-    }
-
-    public class TestDriverWithThreeParameter extends TestDriverWithoutParameter {
-
-        @Override
-        public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
-            List<DriverPropertyInfo> driverPropertyInfos = new ArrayList<>();
-
-            DriverPropertyInfo driverpropertyinfo = new DriverPropertyInfo(OpenshiftProxyDriver.USER_PROPERTY_KEY, USER_PROPERTY);
-            driverpropertyinfo.description = "Openshift user";
-            driverpropertyinfo.required = true;
-            driverPropertyInfos.add(driverpropertyinfo);
-
-            driverpropertyinfo = new DriverPropertyInfo(OpenshiftProxyDriver.PASSWORD_PROPERTY_KEY, PASSWORD_PROPERTY);
-            driverpropertyinfo.description = "Openshift password";
-            driverpropertyinfo.required = true;
-            driverPropertyInfos.add(driverpropertyinfo);
-
-            driverpropertyinfo = new DriverPropertyInfo(OTHER_DRIVER_PROPERTY, OTHER_DRIVER_PROPERTY);
-            driverPropertyInfos.add(driverpropertyinfo);
-
-            return driverPropertyInfos.toArray(new DriverPropertyInfo[driverPropertyInfos.size()]);
-        }
-
-
+        assertEquals("Should contain all properties set by openshiftProxyDriver and additionally property from origin driver", propertyInfo.length, 4);
+        assertTrue(containsProperty(propertyInfo, OpenshiftProxyDriver.USER_PROPERTY_KEY));
+        assertTrue(containsProperty(propertyInfo, OpenshiftProxyDriver.PASSWORD_PROPERTY_KEY));
+        assertTrue(containsProperty(propertyInfo, OpenshiftProxyDriver.SSH_PRIVATE_KEY_PROPERTY_KEY));
+        assertTrue(containsProperty(propertyInfo, TestDriverWithUserAndPasswordAndOtherProperties.OTHER_DRIVER_PROPERTY));
     }
 
 
