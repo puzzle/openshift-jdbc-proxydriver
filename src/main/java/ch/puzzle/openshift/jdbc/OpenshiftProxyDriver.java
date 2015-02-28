@@ -32,22 +32,10 @@ import java.util.logging.Logger;
 public class OpenshiftProxyDriver implements Driver {
     static final String URL_PREFIX = "jdbc:openshiftproxy://";
     static final String URL_PROTOCOL_HOST_DELIMITER = "://";
-    static final String PARAMETER_DELIMITER = "&";
-    static final String DOMAIN_PARAMETER_PREFIX = "domain=";
-    static final String CARTRIDGE_PARAMETER_PREFIX = "cartridge=";
-    static final String DRIVER_PARAMETER_PREFIX = "driver=";
-    static final String FORWARDED_PORT_PARAMETER_PREFIX = "externalforwardedport=";
 
     static final String USER_PROPERTY_KEY = "user";
     static final String PASSWORD_PROPERTY_KEY = "password";
     static final String SSH_PRIVATE_KEY_PROPERTY_KEY = "privateSshKeyFilePath";
-
-    static final String SERVER = "openshiftServerKey";
-    static final String APPLICATION = "applicationKey";
-    static final String DOMAIN = "domainKey";
-    static final String CARTRIDGE = "cartridgeKey";
-    static final String DRIVER = "driverKey";
-    static final String EXTERNAL_FORWARDED_PORT = "externalForwardedPortKey";
 
     static final int MAJOR_VERSION = 1;
     static final int MINOR_VERSION = 0;
@@ -78,28 +66,41 @@ public class OpenshiftProxyDriver implements Driver {
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
         logger.info("proxy connection request to " + url);
-        Properties parameter = extractAndValidateProxyDriverParametersFromUrl(url);
-        verifyUserProperties(info);
+
+        if (!acceptsURL(url)) {
+            logger.info("This driver is the wrong kind of driver to connect to the given URL " + url);
+            return null;
+        }
 
         try {
-            communicator.connect(parameter.getProperty(SERVER), info.getProperty(USER_PROPERTY_KEY), info.getProperty(PASSWORD_PROPERTY_KEY));
-            final DatabaseData databaseData = communicator.readDatabaseData(parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), parameter.getProperty(CARTRIDGE));
+            verifyUserProperties(info);
+            ProxyDriverURL proxyDriverURL = ProxyDriverURL.createValid(URL_PREFIX, url);
+
+            final DatabaseData databaseData = connectToOpenshiftAndGetDatabaseData(proxyDriverURL, info);
+
             int port;
-            if (!parameter.containsKey(EXTERNAL_FORWARDED_PORT)) {
-                logger.info("Start port forwarding");
-                port = communicator.startPortForwarding(parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), databaseData.getConnectionUrl(), info.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY));
+
+            if (proxyDriverURL.hasExternalForwardedPort()) {
+                logger.info("Use external portforwarding on port " + proxyDriverURL.getExternalForwardedPort());
+                port = proxyDriverURL.getExternalForwardedPort();
             } else {
-                logger.info("Use external portforwarding on port " + parameter.getProperty(EXTERNAL_FORWARDED_PORT));
-                port = getIntValueOfExternalForwardedPort(parameter);
+                logger.info("Start port forwarding");
+                port = communicator.startPortForwarding(proxyDriverURL.getApplication(), proxyDriverURL.getDomain(), databaseData.getConnectionUrl(), info.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY));
             }
 
             String connectionUrl = createConnectionUrl(databaseData, port);
             Properties driverConnectionProperties = replaceUserPasswordProperties(info, databaseData.getDbUser(), databaseData.getDbUserPassword());
 
-            return connectToDriver(parameter.getProperty(DRIVER), connectionUrl, driverConnectionProperties);
+            return connectToDriver(proxyDriverURL.getDriver(), connectionUrl, driverConnectionProperties);
         } catch (RuntimeException e) {
             throw new SQLException("Error occurred while communicating with openshift. Reason: " + e.getMessage(), e);
         }
+
+    }
+
+    private DatabaseData connectToOpenshiftAndGetDatabaseData(ProxyDriverURL proxyDriverURL, Properties info) {
+        communicator.connect(proxyDriverURL.getServer(), info.getProperty(USER_PROPERTY_KEY), info.getProperty(PASSWORD_PROPERTY_KEY));
+        return communicator.readDatabaseData(proxyDriverURL.getApplication(), proxyDriverURL.getDomain(), proxyDriverURL.getCartridge());
     }
 
     private Properties replaceUserPasswordProperties(Properties proxyDriverProperties, String dbUser, String dbUserPassword) throws SQLException {
@@ -112,31 +113,6 @@ public class OpenshiftProxyDriver implements Driver {
         return verifyUserProperties(proxyDriverProperties);
     }
 
-    private Properties extractAndValidateProxyDriverParametersFromUrl(String url) throws SQLException {
-        if (acceptsURL(url)) {
-
-            final String urlWithoutProtocol = url.substring(URL_PREFIX.length());
-            final String[] serverWithAppAndArguments = urlWithoutProtocol.split("\\?");
-
-            if (serverWithAppAndArguments.length == 2) {
-
-                String serverWithApp = serverWithAppAndArguments[0];
-                String urlParameter = serverWithAppAndArguments[1];
-
-                return extractAndValidateParameters(serverWithApp, urlParameter);
-            }
-        }
-        throw new SQLException("Invalid URL " + url);
-    }
-
-    private int getIntValueOfExternalForwardedPort(Properties parameter) throws SQLException {
-        final String port = parameter.getProperty(EXTERNAL_FORWARDED_PORT);
-        try {
-            return Integer.valueOf(port);
-        } catch (NumberFormatException e) {
-            throw new SQLException("Invalid port number " + port);
-        }
-    }
 
     /**
      * Close driver is a callback method to clean up open connections to openshift.
@@ -183,67 +159,6 @@ public class OpenshiftProxyDriver implements Driver {
         }
     }
 
-    private Properties extractAndValidateParameters(String serverWithApp, String urlParameter) throws SQLException {
-        Properties properties = new Properties();
-
-        final String[] serverAndApp = serverWithApp.split("/");
-        if (serverAndApp.length == 2) {
-            properties.put(SERVER, serverAndApp[0]);
-            properties.put(APPLICATION, serverAndApp[1]);
-        }
-        for (String parameterValues : urlParameter.split(PARAMETER_DELIMITER)) {
-
-            if (parameterValues.startsWith(DOMAIN_PARAMETER_PREFIX)) {
-                properties.put(DOMAIN, parameterValues.substring(DOMAIN_PARAMETER_PREFIX.length()));
-            }
-            if (parameterValues.startsWith(CARTRIDGE_PARAMETER_PREFIX)) {
-                properties.put(CARTRIDGE, parameterValues.substring(CARTRIDGE_PARAMETER_PREFIX.length()));
-            }
-            if (parameterValues.startsWith(DRIVER_PARAMETER_PREFIX)) {
-                properties.put(DRIVER, parameterValues.substring(DRIVER_PARAMETER_PREFIX.length()));
-            }
-            if (parameterValues.startsWith(FORWARDED_PORT_PARAMETER_PREFIX)) {
-                properties.put(EXTERNAL_FORWARDED_PORT, parameterValues.substring(FORWARDED_PORT_PARAMETER_PREFIX.length()));
-            }
-        }
-
-        verifyExistenceOfMandatoryParameters(properties);
-        return properties;
-    }
-
-    private void verifyExistenceOfMandatoryParameters(Properties properties) throws SQLException {
-        StringBuilder sb = new StringBuilder("Missing mandatory parameter in URL for");
-        boolean hasMissingParameter = false;
-
-        if (!properties.containsKey(SERVER)) {
-            sb.append(" ").append("openshiftServerUrl");
-            hasMissingParameter = true;
-        }
-        if (!properties.containsKey(APPLICATION)) {
-            sb.append(" ").append("applicationName");
-            hasMissingParameter = true;
-        }
-        if (!properties.containsKey(DOMAIN)) {
-            sb.append(" ").append(DOMAIN_PARAMETER_PREFIX);
-            hasMissingParameter = true;
-        }
-        if (!properties.containsKey(CARTRIDGE)) {
-            sb.append(" ").append(CARTRIDGE_PARAMETER_PREFIX);
-            hasMissingParameter = true;
-        }
-        if (!properties.containsKey(DRIVER)) {
-            sb.append(" ").append(DRIVER_PARAMETER_PREFIX);
-            hasMissingParameter = true;
-        }
-        if (hasMissingParameter) {
-            throw new SQLException(sb.toString());
-        }
-    }
-
-    private boolean isParameterValid(String parameter) {
-        return parameter != null && !parameter.isEmpty();
-    }
-
 
     /**
      * {@inheritDoc}
@@ -275,27 +190,27 @@ public class OpenshiftProxyDriver implements Driver {
         driverpropertyinfo.description = "Absolute file path of private ssh key";
         driverPropertyInfos.add(driverpropertyinfo);
 
-        driverPropertyInfos.addAll(getTargetDriverPropertiesWithoutUserAndPassword(url, properties));
+//        driverPropertyInfos.addAll(getTargetDriverPropertiesWithoutUserAndPassword(url, properties));
 
         return driverPropertyInfos.toArray(new DriverPropertyInfo[driverPropertyInfos.size()]);
     }
 
-    private List<DriverPropertyInfo> getTargetDriverPropertiesWithoutUserAndPassword(String url, Properties properties) throws SQLException {
-        List<DriverPropertyInfo> driverPropertiesWithoutUserPassword = new ArrayList<>();
-
-        Properties parameter = extractAndValidateProxyDriverParametersFromUrl(url);
-        Driver driver = getDriverByClassName(parameter.getProperty(DRIVER));
-
-        if (driver != null) {
-            for (DriverPropertyInfo driverpropertyinfo : driver.getPropertyInfo(url, properties)) {
-                if (!isUserOrPasswordProperty(driverpropertyinfo)) {
-                    driverPropertiesWithoutUserPassword.add(driverpropertyinfo);
-                }
-            }
-        }
-
-        return driverPropertiesWithoutUserPassword;
-    }
+//    private List<DriverPropertyInfo> getTargetDriverPropertiesWithoutUserAndPassword(String url, Properties properties) throws SQLException {
+//        List<DriverPropertyInfo> driverPropertiesWithoutUserPassword = new ArrayList<>();
+//
+//        Properties parameter = extractAndValidateProxyDriverParametersFromUrl(url);
+//        Driver driver = getDriverByClassName(parameter.getProperty(DRIVER));
+//
+//        if (driver != null) {
+//            for (DriverPropertyInfo driverpropertyinfo : driver.getPropertyInfo(url, properties)) {
+//                if (!isUserOrPasswordProperty(driverpropertyinfo)) {
+//                    driverPropertiesWithoutUserPassword.add(driverpropertyinfo);
+//                }
+//            }
+//        }
+//
+//        return driverPropertiesWithoutUserPassword;
+//    }
 
     private boolean isUserOrPasswordProperty(DriverPropertyInfo driverpropertyinfo) {
         return USER_PROPERTY_KEY.equals(driverpropertyinfo.name) || PASSWORD_PROPERTY_KEY.equals(driverpropertyinfo.name);

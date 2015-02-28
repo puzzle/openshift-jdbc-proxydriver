@@ -65,7 +65,7 @@ public class DriverTestRunner {
     }
 
     private static String createConnectionUrlWithoutPortForwardParameter(String broker, String application, String namespace, String cartridge, String driver) {
-        return OpenshiftProxyDriver.URL_PREFIX + broker + "/" + application + "?" + OpenshiftProxyDriver.DOMAIN_PARAMETER_PREFIX + namespace + OpenshiftProxyDriver.PARAMETER_DELIMITER + OpenshiftProxyDriver.CARTRIDGE_PARAMETER_PREFIX + cartridge + OpenshiftProxyDriver.PARAMETER_DELIMITER + OpenshiftProxyDriver.DRIVER_PARAMETER_PREFIX + driver;
+        return OpenshiftProxyDriver.URL_PREFIX + broker + "/" + application + "?" + ProxyDriverURL.DOMAIN_PARAMETER_PREFIX + namespace + ProxyDriverURL.PARAMETER_DELIMITER + ProxyDriverURL.CARTRIDGE_PARAMETER_PREFIX + cartridge + ProxyDriverURL.PARAMETER_DELIMITER + ProxyDriverURL.DRIVER_PARAMETER_PREFIX + driver;
     }
 
 }
