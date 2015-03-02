@@ -22,11 +22,12 @@ import com.openshift.client.IOpenShiftConnection;
 import java.io.IOException;
 
 public class OpenshiftConnector {
+    private static final int OPENSHIFT_CONNECTION_TIMEOUT = 90_000;
 
     public IOpenShiftConnection getConnection(String openshiftServerUrl, String openshiftUser, String openshiftPassword) {
         try {
             ConnectionBuilder builder = new ConnectionBuilder(openshiftServerUrl);
-            return builder.credentials(openshiftUser, openshiftPassword).create();
+            return builder.credentials(openshiftUser, openshiftPassword).timeout(OPENSHIFT_CONNECTION_TIMEOUT).create();
         } catch (IOException e) {
             throw new RuntimeException("Could not create connection", e);
         }
