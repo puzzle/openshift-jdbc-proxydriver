@@ -187,11 +187,12 @@ public class OpenshiftProxyDriver implements Driver {
         driverpropertyinfo.description = "Absolute file path of private ssh key";
         driverPropertyInfos.add(driverpropertyinfo);
 
-        driverPropertyInfos.addAll(getTargetDriverPropertiesWithoutUserAndPassword(url, properties));
+//        driverPropertyInfos.addAll(getTargetDriverPropertiesWithoutUserAndPassword(url, properties));
 
         return driverPropertyInfos.toArray(new DriverPropertyInfo[driverPropertyInfos.size()]);
     }
 
+    // TODO driverproperty infos are not working like this!
     private List<DriverPropertyInfo> getTargetDriverPropertiesWithoutUserAndPassword(String url, Properties properties) throws SQLException {
         List<DriverPropertyInfo> driverPropertiesWithoutUserPassword = new ArrayList<>();
 
@@ -203,8 +204,13 @@ public class OpenshiftProxyDriver implements Driver {
         final String connectionUrl = createConnectionUrl(databaseData, 1);
 
         if (driver != null) {
-            for (DriverPropertyInfo driverpropertyinfo : driver.getPropertyInfo(connectionUrl, properties)) {
-                if (!isUserOrPasswordProperty(driverpropertyinfo)) {
+            for (DriverPropertyInfo origindriverpropertyinfo : driver.getPropertyInfo(connectionUrl, properties)) {
+                if (!isUserOrPasswordProperty(origindriverpropertyinfo)) {
+
+                    DriverPropertyInfo driverpropertyinfo = new DriverPropertyInfo(origindriverpropertyinfo.name, origindriverpropertyinfo.value);
+                    driverpropertyinfo.description = origindriverpropertyinfo.description;
+                    driverpropertyinfo.required = origindriverpropertyinfo.required;
+
                     driverPropertiesWithoutUserPassword.add(driverpropertyinfo);
                 }
             }

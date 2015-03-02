@@ -20,6 +20,7 @@ import ch.puzzle.openshift.openshift.DatabaseData;
 import ch.puzzle.openshift.openshift.OpenshiftCommunicationHandler;
 import com.openshift.client.OpenShiftException;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -531,6 +532,7 @@ public class OpenshiftProxyDriverTest {
         assertEquals(OpenshiftProxyDriver.MINOR_VERSION, minorVersion);
     }
 
+    @Ignore("temporary removed this functionality")
     @Test(expected = RuntimeException.class)
     public void onGetPropertyInfoShouldThrowExceptionWhenDriverParameterIsInvalid() throws SQLException {
         // given
@@ -568,6 +570,7 @@ public class OpenshiftProxyDriverTest {
         return false;
     }
 
+    @Ignore("temporary removed this functionality")
     @Test
     public void onGetPropertyInfoShouldReturnPropertiesFromProxyDriverAndAdditionalPropertyFromOriginDriver() throws SQLException {
         // given
