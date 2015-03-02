@@ -21,7 +21,8 @@ import java.util.Properties;
 /**
  * Created by bschwaller on 28.02.15.
  */
-public class ProxyDriverURL {
+public class ProxyDriverURLParameter {
+    static final String DRIVER_PROTOCOL_URL_PREFIX = "jdbc:openshiftproxy://";
 
     static final String PARAMETER_DELIMITER = "&";
     static final String DOMAIN_PARAMETER_PREFIX = "domain=";
@@ -44,7 +45,7 @@ public class ProxyDriverURL {
     private final String driver;
     private final Integer externalForwardedPort;
 
-    private ProxyDriverURL(String server, String application, String domain, String cartridge, String driver, String externalForwardedPort) {
+    private ProxyDriverURLParameter(String server, String application, String domain, String cartridge, String driver, String externalForwardedPort) {
         this.server = verifyNotNullAndNotEmpty(server);
         this.application = verifyNotNullAndNotEmpty(application);
         this.domain = verifyNotNullAndNotEmpty(domain);
@@ -62,13 +63,13 @@ public class ProxyDriverURL {
     }
 
     /**
-     * Parses the connectionUrl and creates a {@link ch.puzzle.openshift.jdbc.ProxyDriverURL} object. Occurrence of all mandatory parameters within the connectionUrl are verified. In case of a missing or invalid (null value) parameter an exception will be thrown.
+     * Parses the connectionUrl and creates a {@link ProxyDriverURLParameter} object. Occurrence of all mandatory parameters within the connectionUrl are verified. In case of a missing or invalid (null value) parameter an exception will be thrown.
      *
-     * @return valid {@link ch.puzzle.openshift.jdbc.ProxyDriverURL} object
+     * @return valid {@link ProxyDriverURLParameter} object
      */
-    public static ProxyDriverURL createValid(String proxyDriverURLPrefix, String connectionUrl) {
-        Properties parameter = extractProxyDriverParametersFromUrl(proxyDriverURLPrefix, connectionUrl);
-        return new ProxyDriverURL(parameter.getProperty(SERVER), parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), parameter.getProperty(CARTRIDGE), parameter.getProperty(DRIVER), parameter.getProperty(EXTERNAL_FORWARDED_PORT));
+    public static ProxyDriverURLParameter createValid(String connectionUrl) {
+        Properties parameter = extractProxyDriverParametersFromUrl(DRIVER_PROTOCOL_URL_PREFIX, connectionUrl);
+        return new ProxyDriverURLParameter(parameter.getProperty(SERVER), parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), parameter.getProperty(CARTRIDGE), parameter.getProperty(DRIVER), parameter.getProperty(EXTERNAL_FORWARDED_PORT));
     }
 
     private static Properties extractProxyDriverParametersFromUrl(String proxyDriverURLPrefix, String url) {
@@ -146,6 +147,13 @@ public class ProxyDriverURL {
             throw new IllegalArgumentException("Argument " + argument + " must not be null or empty");
         }
         return argument;
+    }
+
+    /**
+     * Returns true if the url satisfies the proxydriver protocol
+     */
+    public static boolean acceptProxyDriverProtocol(String url) {
+        return url != null && url.regionMatches(true, 0, DRIVER_PROTOCOL_URL_PREFIX, 0, DRIVER_PROTOCOL_URL_PREFIX.length());
     }
 
 }

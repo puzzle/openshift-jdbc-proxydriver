@@ -71,7 +71,7 @@ public class OpenshiftProxyDriverTest {
         proxy.setConnectionProxy(connectionProxyMock);
 
         properties = createProperties(OPENSHIFT_USER_NAME, OPENSHIFT_PASSWORD);
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
     }
 
@@ -83,7 +83,7 @@ public class OpenshiftProxyDriverTest {
     }
 
     private String createConnectionUrlWithoutPortForwardParameter(String prefix, String server, String application, String namespace, String cartridge, String driver) {
-        return prefix + server + "/" + application + "?" + ProxyDriverURL.DOMAIN_PARAMETER_PREFIX + namespace + ProxyDriverURL.PARAMETER_DELIMITER + ProxyDriverURL.CARTRIDGE_PARAMETER_PREFIX + cartridge + ProxyDriverURL.PARAMETER_DELIMITER + ProxyDriverURL.DRIVER_PARAMETER_PREFIX + driver;
+        return prefix + server + "/" + application + "?" + ProxyDriverURLParameter.DOMAIN_PARAMETER_PREFIX + namespace + ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.CARTRIDGE_PARAMETER_PREFIX + cartridge + ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.DRIVER_PARAMETER_PREFIX + driver;
     }
 
     @Test
@@ -114,7 +114,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenMissingNamespacePrefixInUrl() throws SQLException {
         // given
-        connectionUrl = connectionUrl.replace(ProxyDriverURL.DOMAIN_PARAMETER_PREFIX, "");
+        connectionUrl = connectionUrl.replace(ProxyDriverURLParameter.DOMAIN_PARAMETER_PREFIX, "");
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -123,7 +123,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenMissingCartridgePrefixInUrl() throws SQLException {
         // given
-        connectionUrl = connectionUrl.replace(ProxyDriverURL.CARTRIDGE_PARAMETER_PREFIX, "");
+        connectionUrl = connectionUrl.replace(ProxyDriverURLParameter.CARTRIDGE_PARAMETER_PREFIX, "");
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -132,7 +132,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenMissingDriverPrefixInUrl() throws SQLException {
         // given
-        connectionUrl = connectionUrl.replace(ProxyDriverURL.DRIVER_PARAMETER_PREFIX, "");
+        connectionUrl = connectionUrl.replace(ProxyDriverURLParameter.DRIVER_PARAMETER_PREFIX, "");
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -141,7 +141,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoServerIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, "", APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, "", APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -150,7 +150,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoApplicationIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, "", NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, "", NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -159,7 +159,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoNamespaceIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, "", CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, "", CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -168,7 +168,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoCartridgeIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, "", ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, "", ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -177,7 +177,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoDriverIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, "");
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, "");
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -186,7 +186,7 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void parameterValidationOnConnectShouldThrowExceptionWhenNoLocalPortIsSet() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -233,8 +233,8 @@ public class OpenshiftProxyDriverTest {
     @Test(expected = SQLException.class)
     public void onConnectShouldThrowExceptionOnInvalidDriverClassArgument() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, "invalidDriver");
-        connectionUrl += ProxyDriverURL.PARAMETER_DELIMITER + ProxyDriverURL.FORWARDED_PORT_PARAMETER_PREFIX + 9999;
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, "invalidDriver");
+        connectionUrl += ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.FORWARDED_PORT_PARAMETER_PREFIX + 9999;
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -377,7 +377,7 @@ public class OpenshiftProxyDriverTest {
         // given
 
         mockOpenshiftDatabaseDataResponse();
-        connectionUrl += ProxyDriverURL.PARAMETER_DELIMITER + ProxyDriverURL.FORWARDED_PORT_PARAMETER_PREFIX + "9999";
+        connectionUrl += ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.FORWARDED_PORT_PARAMETER_PREFIX + "9999";
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -405,7 +405,7 @@ public class OpenshiftProxyDriverTest {
         // given
         int forwardedPort = 9999;
         mockOpenshiftDatabaseDataResponse();
-        connectionUrl += ProxyDriverURL.PARAMETER_DELIMITER + ProxyDriverURL.FORWARDED_PORT_PARAMETER_PREFIX + forwardedPort;
+        connectionUrl += ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.FORWARDED_PORT_PARAMETER_PREFIX + forwardedPort;
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -419,7 +419,7 @@ public class OpenshiftProxyDriverTest {
         // given
         String forwardedPort = "Invalid port number";
         mockOpenshiftDatabaseDataResponse();
-        connectionUrl += ProxyDriverURL.PARAMETER_DELIMITER + ProxyDriverURL.FORWARDED_PORT_PARAMETER_PREFIX + forwardedPort;
+        connectionUrl += ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.FORWARDED_PORT_PARAMETER_PREFIX + forwardedPort;
 
         // when
         proxy.connect(connectionUrl, properties);
@@ -493,7 +493,7 @@ public class OpenshiftProxyDriverTest {
     @Test
     public void onAcceptsURLShouldReturnTrueWhenUrlHasValidProxyPrefixAndValidParameter() throws SQLException {
         // given
-        String connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
+        String connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, ORIGINAL_POSTGRES_JDBC_DRIVER_FULL_CLASS_NAME);
 
         // when
         final boolean isUrlAccepted = proxy.acceptsURL(connectionUrl);
@@ -505,7 +505,7 @@ public class OpenshiftProxyDriverTest {
     @Test
     public void onAcceptsURLShouldReturnTrueWhenUrlHasValidProxyPrefixButInvalidUrlParameter() throws SQLException {
         // given
-        String connectionUrl = OpenshiftProxyDriver.URL_PREFIX + "invalid url parameter";
+        String connectionUrl = ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX + "invalid url parameter";
         // when
         final boolean isUrlAccepted = proxy.acceptsURL(connectionUrl);
 
@@ -535,7 +535,7 @@ public class OpenshiftProxyDriverTest {
     public void onGetPropertyInfoShouldThrowExceptionWhenDriverParameterIsInvalid() throws SQLException {
         // given
         properties = createProperties(OPENSHIFT_USER_NAME, OPENSHIFT_PASSWORD);
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, "invalidDriverName");
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, "invalidDriverName");
 
         // when
         proxy.getPropertyInfo(connectionUrl, properties);
@@ -545,7 +545,7 @@ public class OpenshiftProxyDriverTest {
     @Test
     public void onGetPropertyInfoShouldReturnPropertiesFromProxyDriver() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, TestDriverWithoutProperties.class.getCanonicalName());
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, TestDriverWithoutProperties.class.getCanonicalName());
         mockOpenshiftDatabaseDataResponse("dbUser", "dbPwd", "postgresql://$OPENSHIFT_POSTGRESQL_DB_HOST:$OPENSHIFT_POSTGRESQL_DB_PORT", "dbName");
 
         // when
@@ -571,7 +571,7 @@ public class OpenshiftProxyDriverTest {
     @Test
     public void onGetPropertyInfoShouldReturnPropertiesFromProxyDriverAndAdditionalPropertyFromOriginDriver() throws SQLException {
         // given
-        connectionUrl = createConnectionUrlWithoutPortForwardParameter(OpenshiftProxyDriver.URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, TestDriverWithUserAndPasswordAndOtherProperties.class.getCanonicalName());
+        connectionUrl = createConnectionUrlWithoutPortForwardParameter(ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX, OPENSHIFT_SERVER_NAME, APPLICATION_NAME, NAMESPACE_NAME, CARTRIDGE_NAME, TestDriverWithUserAndPasswordAndOtherProperties.class.getCanonicalName());
         mockOpenshiftDatabaseDataResponse("dbUser", "dbPwd", "postgresql://$OPENSHIFT_POSTGRESQL_DB_HOST:$OPENSHIFT_POSTGRESQL_DB_PORT", "dbName");
 
         // when

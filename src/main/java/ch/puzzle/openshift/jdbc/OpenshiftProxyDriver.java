@@ -30,7 +30,6 @@ import java.util.logging.Logger;
  * Created by bschwaller on 11.02.15.
  */
 public class OpenshiftProxyDriver implements Driver {
-    static final String URL_PREFIX = "jdbc:openshiftproxy://";
     static final String URL_PROTOCOL_HOST_DELIMITER = "://";
 
     static final String USER_PROPERTY_KEY = "user";
@@ -73,32 +72,32 @@ public class OpenshiftProxyDriver implements Driver {
         try {
             verifyUserPasswordProperties(info);
 
-            ProxyDriverURL proxyDriverURL = ProxyDriverURL.createValid(URL_PREFIX, url);
-            final DatabaseData databaseData = connectToOpenshiftAndGetDatabaseData(proxyDriverURL, info);
+            ProxyDriverURLParameter proxyDriverURLParameter = ProxyDriverURLParameter.createValid(url);
+            final DatabaseData databaseData = connectToOpenshiftAndGetDatabaseData(proxyDriverURLParameter, info);
 
             int port;
 
-            if (proxyDriverURL.hasExternalForwardedPort()) {
-                logger.info("Use external portforwarding on port " + proxyDriverURL.getExternalForwardedPort());
-                port = proxyDriverURL.getExternalForwardedPort();
+            if (proxyDriverURLParameter.hasExternalForwardedPort()) {
+                logger.info("Use external portforwarding on port " + proxyDriverURLParameter.getExternalForwardedPort());
+                port = proxyDriverURLParameter.getExternalForwardedPort();
             } else {
                 logger.info("Start port forwarding");
-                port = communicator.startPortForwarding(proxyDriverURL.getApplication(), proxyDriverURL.getDomain(), databaseData.getConnectionUrl(), info.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY));
+                port = communicator.startPortForwarding(proxyDriverURLParameter.getApplication(), proxyDriverURLParameter.getDomain(), databaseData.getConnectionUrl(), info.getProperty(SSH_PRIVATE_KEY_PROPERTY_KEY));
             }
 
             String connectionUrl = createConnectionUrl(databaseData, port);
             Properties driverConnectionProperties = replaceUserPasswordProperties(info, databaseData.getDbUser(), databaseData.getDbUserPassword());
 
-            return connectToDriver(proxyDriverURL.getDriver(), connectionUrl, driverConnectionProperties);
+            return connectToDriver(proxyDriverURLParameter.getDriver(), connectionUrl, driverConnectionProperties);
         } catch (RuntimeException e) {
             throw new SQLException("Error occurred while communicating with openshift. Reason: " + e.getMessage(), e);
         }
 
     }
 
-    private DatabaseData connectToOpenshiftAndGetDatabaseData(ProxyDriverURL proxyDriverURL, Properties info) {
-        communicator.connect(proxyDriverURL.getServer(), info.getProperty(USER_PROPERTY_KEY), info.getProperty(PASSWORD_PROPERTY_KEY));
-        return communicator.readDatabaseData(proxyDriverURL.getApplication(), proxyDriverURL.getDomain(), proxyDriverURL.getCartridge());
+    private DatabaseData connectToOpenshiftAndGetDatabaseData(ProxyDriverURLParameter proxyDriverURLParameter, Properties info) {
+        communicator.connect(proxyDriverURLParameter.getServer(), info.getProperty(USER_PROPERTY_KEY), info.getProperty(PASSWORD_PROPERTY_KEY));
+        return communicator.readDatabaseData(proxyDriverURLParameter.getApplication(), proxyDriverURLParameter.getDomain(), proxyDriverURLParameter.getCartridge());
     }
 
     private Properties replaceUserPasswordProperties(Properties proxyDriverProperties, String dbUser, String dbUserPassword) throws SQLException {
@@ -163,7 +162,7 @@ public class OpenshiftProxyDriver implements Driver {
      */
     @Override
     public boolean acceptsURL(String url) throws SQLException {
-        return url != null && url.regionMatches(true, 0, URL_PREFIX, 0, URL_PREFIX.length());
+        return ProxyDriverURLParameter.acceptProxyDriverProtocol(url);
     }
 
     /**
@@ -196,10 +195,10 @@ public class OpenshiftProxyDriver implements Driver {
     private List<DriverPropertyInfo> getTargetDriverPropertiesWithoutUserAndPassword(String url, Properties properties) throws SQLException {
         List<DriverPropertyInfo> driverPropertiesWithoutUserPassword = new ArrayList<>();
 
-        ProxyDriverURL proxyDriverURL = ProxyDriverURL.createValid(URL_PREFIX, url);
-        final DatabaseData databaseData = connectToOpenshiftAndGetDatabaseData(proxyDriverURL, properties);
+        ProxyDriverURLParameter proxyDriverURLParameter = ProxyDriverURLParameter.createValid(url);
+        final DatabaseData databaseData = connectToOpenshiftAndGetDatabaseData(proxyDriverURLParameter, properties);
 
-        Driver driver = getDriverByClassName(proxyDriverURL.getDriver());
+        Driver driver = getDriverByClassName(proxyDriverURLParameter.getDriver());
 
         final String connectionUrl = createConnectionUrl(databaseData, 1);
 
