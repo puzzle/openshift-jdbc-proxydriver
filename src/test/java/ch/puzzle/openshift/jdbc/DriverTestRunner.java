@@ -35,7 +35,6 @@ public class DriverTestRunner {
         String application = "cv2";
         String domain = "puzzle";
         String cartridge = "postgresql-9.2";
-        String driver = "org.postgresql.Driver";
 
         String openshiftUser = System.getProperty("openshiftUser");
         String openshiftUserPassword = System.getProperty("openshiftUserPassword");
@@ -44,12 +43,12 @@ public class DriverTestRunner {
             throw new IllegalArgumentException("Missing user or password systemproperty argument! Define the following arguments as on runconfiguration -DopenshiftUser=<openshiftuser> -DopenshiftUserPassword=<password>");
         }
 
-        connect(openshiftServer, application, domain, cartridge, driver, openshiftUser, openshiftUserPassword);
+        connect(openshiftServer, application, domain, cartridge, openshiftUser, openshiftUserPassword);
     }
 
-    private static void connect(String broker, String application, String namespace, String cartridge, String driver, String openshiftUser, String openshiftUserPassword) throws SQLException {
+    private static void connect(String openshiftServer, String application, String domain, String cartridge, String openshiftUser, String openshiftUserPassword) throws SQLException {
         OpenshiftProxyDriver proxy = new OpenshiftProxyDriver();
-        String connectionUrl = createConnectionUrlWithoutPortForwardParameter(broker, application, namespace, cartridge, driver);
+        String connectionUrl = createConnectionUrlWithoutPortForwardParameter(openshiftServer, application, domain, cartridge);
 
         Properties props = createProperties(openshiftUser, openshiftUserPassword);
 
@@ -64,8 +63,8 @@ public class DriverTestRunner {
         return properties;
     }
 
-    private static String createConnectionUrlWithoutPortForwardParameter(String broker, String application, String namespace, String cartridge, String driver) {
-        return ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX + broker + "/" + application + "?" + ProxyDriverURLParameter.DOMAIN_PARAMETER_PREFIX + namespace + ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.CARTRIDGE_PARAMETER_PREFIX + cartridge + ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.DRIVER_PARAMETER_PREFIX + driver;
+    private static String createConnectionUrlWithoutPortForwardParameter(String openshiftServer, String application, String domain, String cartridge) {
+        return ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX + openshiftServer + "/" + application + "?" + ProxyDriverURLParameter.DOMAIN_PARAMETER_PREFIX + domain + ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.CARTRIDGE_PARAMETER_PREFIX + cartridge + ProxyDriverURLParameter.PARAMETER_DELIMITER;
     }
 
 }

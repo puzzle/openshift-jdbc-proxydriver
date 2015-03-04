@@ -40,7 +40,6 @@ public class OpenshiftProxyDriver implements Driver {
     static final int MINOR_VERSION = 0;
 
     private Logger logger = Logger.getLogger(OpenshiftProxyDriver.class.getName());
-    // TODO verify logging
 
     private OpenshiftCommunicationHandler communicator;
     private ConnectionWrapper connectionProxy;
@@ -88,7 +87,7 @@ public class OpenshiftProxyDriver implements Driver {
             String connectionUrl = createConnectionUrl(databaseData, port);
             Properties driverConnectionProperties = replaceUserPasswordProperties(info, databaseData.getDbUser(), databaseData.getDbUserPassword());
 
-            return connectToDriver(proxyDriverURLParameter.getDriver(), connectionUrl, driverConnectionProperties);
+            return connectToDriver(proxyDriverURLParameter, connectionUrl, driverConnectionProperties);
         } catch (RuntimeException e) {
             throw new SQLException("Error occurred while communicating with openshift. Reason: " + e.getMessage(), e);
         }
@@ -134,9 +133,8 @@ public class OpenshiftProxyDriver implements Driver {
         throw new SQLException("Invalid user properties! At least user and password must be set!");
     }
 
-    private Connection connectToDriver(String driverClassName, String url, Properties info) throws SQLException {
+    private Connection connectToDriver(ProxyDriverURLParameter proxyDriverURLParameter, String url, Properties info) throws SQLException {
         try {
-            getDriverByClassName(driverClassName);
             return connectionProxy.wrap(url, info);
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
@@ -187,40 +185,7 @@ public class OpenshiftProxyDriver implements Driver {
         driverpropertyinfo.description = "Absolute file path of private ssh key";
         driverPropertyInfos.add(driverpropertyinfo);
 
-//        driverPropertyInfos.addAll(getTargetDriverPropertiesWithoutUserAndPassword(url, properties));
-
         return driverPropertyInfos.toArray(new DriverPropertyInfo[driverPropertyInfos.size()]);
-    }
-
-    // TODO driverproperty infos are not working like this!
-    private List<DriverPropertyInfo> getTargetDriverPropertiesWithoutUserAndPassword(String url, Properties properties) throws SQLException {
-        List<DriverPropertyInfo> driverPropertiesWithoutUserPassword = new ArrayList<>();
-
-        ProxyDriverURLParameter proxyDriverURLParameter = ProxyDriverURLParameter.createValid(url);
-        final DatabaseData databaseData = connectToOpenshiftAndGetDatabaseData(proxyDriverURLParameter, properties);
-
-        Driver driver = getDriverByClassName(proxyDriverURLParameter.getDriver());
-
-        final String connectionUrl = createConnectionUrl(databaseData, 1);
-
-        if (driver != null) {
-            for (DriverPropertyInfo origindriverpropertyinfo : driver.getPropertyInfo(connectionUrl, properties)) {
-                if (!isUserOrPasswordProperty(origindriverpropertyinfo)) {
-
-                    DriverPropertyInfo driverpropertyinfo = new DriverPropertyInfo(origindriverpropertyinfo.name, origindriverpropertyinfo.value);
-                    driverpropertyinfo.description = origindriverpropertyinfo.description;
-                    driverpropertyinfo.required = origindriverpropertyinfo.required;
-
-                    driverPropertiesWithoutUserPassword.add(driverpropertyinfo);
-                }
-            }
-        }
-
-        return driverPropertiesWithoutUserPassword;
-    }
-
-    private boolean isUserOrPasswordProperty(DriverPropertyInfo driverpropertyinfo) {
-        return USER_PROPERTY_KEY.equals(driverpropertyinfo.name) || PASSWORD_PROPERTY_KEY.equals(driverpropertyinfo.name);
     }
 
     /**
@@ -263,22 +228,6 @@ public class OpenshiftProxyDriver implements Driver {
             DriverManager.registerDriver(new OpenshiftProxyDriver());
         } catch (SQLException exception) {
             throw new RuntimeException("Error registering driver", exception);
-        }
-    }
-
-    private java.sql.Driver getDriverByClassName(String className) {
-        try {
-            Class<?> c = Class.forName(className);
-            Object o = c.newInstance();
-            if (o instanceof java.sql.Driver) {
-                return (java.sql.Driver) o;
-            } else {
-                throw new RuntimeException("Could not cast " + className + " to java.sql.Driver");
-            }
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException("Could not find driver class", e);
-        } catch (InstantiationException | IllegalAccessException e) {
-            throw new RuntimeException("Could not instantiate driver class", e);
         }
     }
 

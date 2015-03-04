@@ -27,14 +27,12 @@ public class ProxyDriverURLParameter {
     static final String PARAMETER_DELIMITER = "&";
     static final String DOMAIN_PARAMETER_PREFIX = "domain=";
     static final String CARTRIDGE_PARAMETER_PREFIX = "cartridge=";
-    static final String DRIVER_PARAMETER_PREFIX = "driver=";
     static final String FORWARDED_PORT_PARAMETER_PREFIX = "externalforwardedport=";
 
     static final String SERVER = "openshiftServerKey";
     static final String APPLICATION = "applicationKey";
     static final String DOMAIN = "domainKey";
     static final String CARTRIDGE = "cartridgeKey";
-    static final String DRIVER = "driverKey";
     static final String EXTERNAL_FORWARDED_PORT = "externalForwardedPortKey";
 
 
@@ -42,15 +40,13 @@ public class ProxyDriverURLParameter {
     private final String application;
     private final String domain;
     private final String cartridge;
-    private final String driver;
     private final Integer externalForwardedPort;
 
-    private ProxyDriverURLParameter(String server, String application, String domain, String cartridge, String driver, String externalForwardedPort) {
+    private ProxyDriverURLParameter(String server, String application, String domain, String cartridge, String externalForwardedPort) {
         this.server = verifyNotNullAndNotEmpty(server);
         this.application = verifyNotNullAndNotEmpty(application);
         this.domain = verifyNotNullAndNotEmpty(domain);
         this.cartridge = verifyNotNullAndNotEmpty(cartridge);
-        this.driver = verifyNotNullAndNotEmpty(driver);
         this.externalForwardedPort = convertIfNotNull(externalForwardedPort);
     }
 
@@ -69,7 +65,7 @@ public class ProxyDriverURLParameter {
      */
     public static ProxyDriverURLParameter createValid(String connectionUrl) {
         Properties parameter = extractProxyDriverParametersFromUrl(DRIVER_PROTOCOL_URL_PREFIX, connectionUrl);
-        return new ProxyDriverURLParameter(parameter.getProperty(SERVER), parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), parameter.getProperty(CARTRIDGE), parameter.getProperty(DRIVER), parameter.getProperty(EXTERNAL_FORWARDED_PORT));
+        return new ProxyDriverURLParameter(parameter.getProperty(SERVER), parameter.getProperty(APPLICATION), parameter.getProperty(DOMAIN), parameter.getProperty(CARTRIDGE), parameter.getProperty(EXTERNAL_FORWARDED_PORT));
     }
 
     private static Properties extractProxyDriverParametersFromUrl(String proxyDriverURLPrefix, String url) {
@@ -103,9 +99,6 @@ public class ProxyDriverURLParameter {
             if (parameterValues.startsWith(CARTRIDGE_PARAMETER_PREFIX)) {
                 properties.put(CARTRIDGE, parameterValues.substring(CARTRIDGE_PARAMETER_PREFIX.length()));
             }
-            if (parameterValues.startsWith(DRIVER_PARAMETER_PREFIX)) {
-                properties.put(DRIVER, parameterValues.substring(DRIVER_PARAMETER_PREFIX.length()));
-            }
             if (parameterValues.startsWith(FORWARDED_PORT_PARAMETER_PREFIX)) {
                 properties.put(EXTERNAL_FORWARDED_PORT, parameterValues.substring(FORWARDED_PORT_PARAMETER_PREFIX.length()));
             }
@@ -128,10 +121,6 @@ public class ProxyDriverURLParameter {
 
     public String getCartridge() {
         return cartridge;
-    }
-
-    public String getDriver() {
-        return driver;
     }
 
     public Integer getExternalForwardedPort() {
