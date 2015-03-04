@@ -77,7 +77,7 @@ public class OpenshiftProxyDriverTest {
     }
 
     private String createConnectionUrlWithoutPortForwardParameter(String prefix, String server, String application, String domain, String cartridge) {
-        return prefix + server + "/" + application + "?" + ProxyDriverURLParameter.DOMAIN_PARAMETER_PREFIX + domain + ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.CARTRIDGE_PARAMETER_PREFIX + cartridge + ProxyDriverURLParameter.PARAMETER_DELIMITER;
+        return prefix + server + "/" + application + "?" + ProxyDriverURLParameter.DOMAIN_PARAMETER_PREFIX + domain + ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.CARTRIDGE_PARAMETER_PREFIX + cartridge;
     }
 
     @Test
@@ -266,6 +266,47 @@ public class OpenshiftProxyDriverTest {
         assertEquals(dbPwd, properties.get(OpenshiftProxyDriver.PASSWORD_PROPERTY_KEY));
     }
 
+    @Test
+    public void onConnectShouldRemoveProxyDriverSshKeyProperty() throws SQLException {
+        // given
+        mockOpenshiftDatabaseDataResponse();
+
+        properties.put(OpenshiftProxyDriver.SSH_PRIVATE_KEY_PROPERTY_KEY, "");
+
+        // when
+        proxy.connect(connectionUrl, properties);
+
+        // then
+        ArgumentCaptor<Properties> argCapt = ArgumentCaptor.forClass(Properties.class);
+        verify(connectionProxyMock).wrap(anyString(), argCapt.capture());
+
+        final Properties properties = argCapt.getAllValues().get(0);
+        assertFalse(properties.containsKey(OpenshiftProxyDriver.SSH_PRIVATE_KEY_PROPERTY_KEY));
+    }
+
+    @Test
+    public void onConnectShouldDelegateTargetDriverProperties() throws SQLException {
+        // given
+        mockOpenshiftDatabaseDataResponse();
+
+        String targetDriverProperty1 = "targetDriverProperty1";
+        String targetDriverProperty2 = "targetDriverProperty2";
+
+        properties.put(targetDriverProperty1, "any value");
+        properties.put(targetDriverProperty2, "any value");
+
+        // when
+        proxy.connect(connectionUrl, properties);
+
+        // then
+        ArgumentCaptor<Properties> argCapt = ArgumentCaptor.forClass(Properties.class);
+        verify(connectionProxyMock).wrap(anyString(), argCapt.capture());
+
+        final Properties properties = argCapt.getAllValues().get(0);
+        assertTrue(properties.containsKey(targetDriverProperty1));
+        assertTrue(properties.containsKey(targetDriverProperty2));
+    }
+
 
     private void mockOpenshiftDatabaseDataResponse(String dbUser, String dbPwd, String dbConnectionUrl, String dbName) {
         DatabaseData databaseTO = new DatabaseData(dbUser, dbPwd, dbConnectionUrl, dbName);
@@ -316,11 +357,8 @@ public class OpenshiftProxyDriverTest {
     @Test
     public void onConnectShouldExtractAndDelegateWithConnectionUrlUsingLocalhost() throws SQLException {
         // given
-        String dbUser = "dbUser";
-        String dbPwd = "dbPwd";
-        String dbConnectionUrl = "postgresql://$OPENSHIFT_POSTGRESQL_DB_HOST:$OPENSHIFT_POSTGRESQL_DB_PORT";
-        String dbName = "dbName";
-        mockOpenshiftDatabaseDataResponse(dbUser, dbPwd, dbConnectionUrl, dbName);
+        mockOpenshiftDatabaseDataResponse();
+
         // when
         proxy.connect(connectionUrl, properties);
 
@@ -396,12 +434,8 @@ public class OpenshiftProxyDriverTest {
     @Test
     public void onConnectShouldExtractAndDelegateWithConnectionUrlUsingPort() throws SQLException {
         // given
-        String dbUser = "dbUser";
-        String dbPwd = "dbPwd";
-        String dbConnectionUrl = "postgresql://$OPENSHIFT_POSTGRESQL_DB_HOST:$OPENSHIFT_POSTGRESQL_DB_PORT";
-        String dbName = "dbName";
         int forwardedPort = 9999;
-        mockOpenshiftDatabaseDataResponse(dbUser, dbPwd, dbConnectionUrl, dbName);
+        mockOpenshiftDatabaseDataResponse();
         when(communicatorMock.startPortForwarding(APPLICATION_NAME, DOMAIN_NAME, OPENSHIFT_DB_CONNECTION_URL, null)).thenReturn(forwardedPort);
 
         // when

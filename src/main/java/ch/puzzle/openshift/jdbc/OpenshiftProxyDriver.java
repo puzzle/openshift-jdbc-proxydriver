@@ -85,13 +85,26 @@ public class OpenshiftProxyDriver implements Driver {
             }
 
             String connectionUrl = createConnectionUrl(databaseData, port);
-            Properties driverConnectionProperties = replaceUserPasswordProperties(info, databaseData.getDbUser(), databaseData.getDbUserPassword());
+            Properties targetDriverPropertiesInfo = createTargetDriverPropertiesInfo(info, databaseData);
 
-            return connectToDriver(connectionUrl, driverConnectionProperties);
+            return connectToDriver(connectionUrl, targetDriverPropertiesInfo);
         } catch (RuntimeException e) {
             throw new SQLException("Error occurred while communicating with openshift. Reason: " + e.getMessage(), e);
         }
 
+    }
+
+    private Properties createTargetDriverPropertiesInfo(Properties allPropertyInfos, DatabaseData databaseData) {
+        removeProxyDriverSpecificProperties(allPropertyInfos);
+        addTargetDriverUserPasswordProperties(allPropertyInfos, databaseData.getDbUser(), databaseData.getDbUserPassword());
+
+        return allPropertyInfos;
+    }
+
+    private void removeProxyDriverSpecificProperties(Properties allPropertyInfos) {
+        allPropertyInfos.remove(USER_PROPERTY_KEY);
+        allPropertyInfos.remove(PASSWORD_PROPERTY_KEY);
+        allPropertyInfos.remove(SSH_PRIVATE_KEY_PROPERTY_KEY);
     }
 
     private DatabaseData connectToOpenshiftAndGetDatabaseData(ProxyDriverURLParameter proxyDriverURLParameter, Properties info) {
@@ -99,15 +112,9 @@ public class OpenshiftProxyDriver implements Driver {
         return communicator.readDatabaseData(proxyDriverURLParameter.getApplication(), proxyDriverURLParameter.getDomain(), proxyDriverURLParameter.getCartridge());
     }
 
-    private Properties replaceUserPasswordProperties(Properties proxyDriverProperties, String dbUser, String dbUserPassword) throws SQLException {
-        proxyDriverProperties.remove(USER_PROPERTY_KEY);
-        proxyDriverProperties.remove(PASSWORD_PROPERTY_KEY);
-        proxyDriverProperties.remove(SSH_PRIVATE_KEY_PROPERTY_KEY); // TODO test
-
+    private void addTargetDriverUserPasswordProperties(Properties proxyDriverProperties, String dbUser, String dbUserPassword) {
         proxyDriverProperties.put(USER_PROPERTY_KEY, dbUser);
         proxyDriverProperties.put(PASSWORD_PROPERTY_KEY, dbUserPassword);
-
-        return verifyUserPasswordProperties(proxyDriverProperties);
     }
 
 

@@ -3,7 +3,7 @@ OpenShift JDBC Proxy Driver
 
 JDBC Proxy Driver for OpenShift
 
-This driver proxy reads the db connection parameter from the applications database cartridge starts portforwarding and opens a connection to the database. 
+This proxy driver reads the db connection parameter from the application database cartridge, in case of an idles application state wakes up the application, then starts portforwarding and opens a connection to the database.
 
 Usage
 -----
@@ -16,12 +16,11 @@ Driver class:
 ch.puzzle.openshift.jdbc.OpenshiftProxyDriver
 
 Connection URL:
-jdbc:openshiftproxy://[serverURL]/[app]?domain=[domain]&cartridge=[cartridge]&driver=[driver]
+jdbc:openshiftproxy://[serverURL]/[app]?domain=[domain]&cartridge=[cartridge]
 * serverURL: openshift server
 * app: application name
 * domain: application domain name
 * cartridge: database cartridge name. (ex. postgresql-9.2)
-* driver: driver class for database type (ex. org.postgresql.Driver)
 * using the optional argument: &externalforwardedport=[Port] will try to connect to the given port. In this case the proxy driver does not do any port forwarding!
 
 Mandatory properties:
@@ -35,15 +34,12 @@ If this property is not set then the key stored under "~/.ssh/id_rsa" is used by
 
 Prerequisite
 ------------
-You will need to have an openshift user account and uploaded valid ssh keys.
-
-Currently supported database driver
--------------------------
-* Postgresql: org.postgresql:postgresql:9.3-1102-jdbc4
-* MySql: mysql:mysql-connector-java:5.1.9
-
+* You will need to have an openshift user account and uploaded valid ssh keys.
+* The driver (jar) has to be within the database client tools classpath (ex. add the driver jar additionally to the proxy driver jar)
 
 Development/Testrunner
 ----------------------
 For runing the proxy driver use "ch.puzzle.openshift.jdbc.DriverTestRunner" and define vm arguments -DopenshiftUser=<openshiftuser> -DopenshiftUserPassword=<password> within the runconfiguration
-
+This DriverTestRunner loads currently the following drivers:
+* Postgresql: org.postgresql:postgresql:9.3-1102-jdbc4
+* MySql: mysql:mysql-connector-java:5.1.9
