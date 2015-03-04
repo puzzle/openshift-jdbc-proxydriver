@@ -31,9 +31,9 @@ public class DriverTestRunner {
      */
     public static void main(String[] args) throws Exception {
 
-        String openshiftServer = "broker.openshift-dev.puzzle.ch";
-        String application = "cv2";
-        String domain = "puzzle";
+        String openshiftServer = "openshift.redhat.com";
+        String application = "ref";
+        String domain = "rocketknaller";
         String cartridge = "postgresql-9.2";
 
         String openshiftUser = System.getProperty("openshiftUser");
@@ -64,7 +64,7 @@ public class DriverTestRunner {
     }
 
     private static String createConnectionUrlWithoutPortForwardParameter(String openshiftServer, String application, String domain, String cartridge) {
-        return ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX + openshiftServer + "/" + application + "?" + ProxyDriverURLParameter.DOMAIN_PARAMETER_PREFIX + domain + ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.CARTRIDGE_PARAMETER_PREFIX + cartridge + ProxyDriverURLParameter.PARAMETER_DELIMITER;
+        return ProxyDriverURLParameter.DRIVER_PROTOCOL_URL_PREFIX + openshiftServer + "/" + application + "?" + ProxyDriverURLParameter.DOMAIN_PARAMETER_PREFIX + domain + ProxyDriverURLParameter.PARAMETER_DELIMITER + ProxyDriverURLParameter.CARTRIDGE_PARAMETER_PREFIX + cartridge;
     }
 
 }

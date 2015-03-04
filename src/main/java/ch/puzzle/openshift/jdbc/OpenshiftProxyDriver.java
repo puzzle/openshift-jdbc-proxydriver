@@ -57,7 +57,7 @@ public class OpenshiftProxyDriver implements Driver {
     /**
      * TODO javadoc
      *
-     * @see com.mysql.jdbc.Driver#connect(String, java.util.Properties)
+     * @see Driver#connect(String, java.util.Properties)
      */
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
@@ -87,7 +87,7 @@ public class OpenshiftProxyDriver implements Driver {
             String connectionUrl = createConnectionUrl(databaseData, port);
             Properties driverConnectionProperties = replaceUserPasswordProperties(info, databaseData.getDbUser(), databaseData.getDbUserPassword());
 
-            return connectToDriver(proxyDriverURLParameter, connectionUrl, driverConnectionProperties);
+            return connectToDriver(connectionUrl, driverConnectionProperties);
         } catch (RuntimeException e) {
             throw new SQLException("Error occurred while communicating with openshift. Reason: " + e.getMessage(), e);
         }
@@ -102,6 +102,7 @@ public class OpenshiftProxyDriver implements Driver {
     private Properties replaceUserPasswordProperties(Properties proxyDriverProperties, String dbUser, String dbUserPassword) throws SQLException {
         proxyDriverProperties.remove(USER_PROPERTY_KEY);
         proxyDriverProperties.remove(PASSWORD_PROPERTY_KEY);
+        proxyDriverProperties.remove(SSH_PRIVATE_KEY_PROPERTY_KEY); // TODO test
 
         proxyDriverProperties.put(USER_PROPERTY_KEY, dbUser);
         proxyDriverProperties.put(PASSWORD_PROPERTY_KEY, dbUserPassword);
@@ -133,9 +134,11 @@ public class OpenshiftProxyDriver implements Driver {
         throw new SQLException("Invalid user properties! At least user and password must be set!");
     }
 
-    private Connection connectToDriver(ProxyDriverURLParameter proxyDriverURLParameter, String url, Properties info) throws SQLException {
+    private Connection connectToDriver(String url, Properties info) throws SQLException {
         try {
-            return connectionProxy.wrap(url, info);
+            final Connection wrappedConnection = connectionProxy.wrap(url, info);
+            logger.info("Successfully established connection to " + url);
+            return wrappedConnection;
         } catch (Exception e) {
             throw new SQLException(e.getMessage());
         }

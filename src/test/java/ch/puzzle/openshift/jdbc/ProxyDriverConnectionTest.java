@@ -16,7 +16,6 @@
 
 package ch.puzzle.openshift.jdbc;
 
-import com.mysql.jdbc.Connection;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -24,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.runners.MockitoJUnitRunner;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 
 @RunWith(MockitoJUnitRunner.class)
