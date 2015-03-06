@@ -64,7 +64,7 @@ public class OpenshiftProxyDriver implements Driver {
         logger.info("proxy connection request to " + url);
 
         if (!acceptsURL(url)) {
-            logger.info("This driver is the wrong kind of driver to connect to the given URL " + url);
+            logger.fine("This driver is the wrong kind of driver to connect to the given URL " + url);
             return null;
         }
 
@@ -108,8 +108,15 @@ public class OpenshiftProxyDriver implements Driver {
     }
 
     private DatabaseData connectToOpenshiftAndGetDatabaseData(ProxyDriverURLParameter proxyDriverURLParameter, Properties info) {
-        communicator.connect(proxyDriverURLParameter.getServer(), info.getProperty(USER_PROPERTY_KEY), info.getProperty(PASSWORD_PROPERTY_KEY));
-        return communicator.readDatabaseData(proxyDriverURLParameter.getApplication(), proxyDriverURLParameter.getDomain(), proxyDriverURLParameter.getCartridge());
+        try {
+            logger.fine("Connect to openshift server");
+            communicator.connect(proxyDriverURLParameter.getServer(), info.getProperty(USER_PROPERTY_KEY), info.getProperty(PASSWORD_PROPERTY_KEY));
+            logger.fine("Read database data from cartridge");
+            return communicator.readDatabaseData(proxyDriverURLParameter.getApplication(), proxyDriverURLParameter.getDomain(), proxyDriverURLParameter.getCartridge());
+        } catch (Exception e) {
+            logger.warning("Could not connect to openshift and read database data! Reason: " + e.getMessage());
+            throw new RuntimeException("Error connecting and reading database data from openshift server", e);
+        }
     }
 
     private void addTargetDriverUserPasswordProperties(Properties proxyDriverProperties, String dbUser, String dbUserPassword) {

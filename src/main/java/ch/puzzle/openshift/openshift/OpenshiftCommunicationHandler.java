@@ -50,7 +50,6 @@ public class OpenshiftCommunicationHandler {
 
 
     private Logger logger = Logger.getLogger(OpenshiftCommunicationHandler.class.getName());
-    // TODO implement logging
 
     private OpenshiftConnector connectionCreator;
     private SessionConnector sessionConnector;
@@ -149,7 +148,7 @@ public class OpenshiftCommunicationHandler {
                 if (connectionUrl.startsWith(port.getName())) {
                     return port;
                 } else {
-                    logger.info("Output line " + line + " is not matching the port service");
+                    logger.fine("Output line " + line + " is not matching the port service");
                 }
             }
         }
@@ -206,6 +205,7 @@ public class OpenshiftCommunicationHandler {
     private void stopPortforwarding() {
         if (hasForwardedPort()) {
             try {
+                logger.info("Stop port forwarding for " + port.toString());
                 port.stopPortForwarding(session);
             } catch (RuntimeException e) {
                 logger.info("Error stopping port forwarding");
