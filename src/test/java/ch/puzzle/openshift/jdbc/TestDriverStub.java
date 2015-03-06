@@ -23,16 +23,27 @@ import java.util.logging.Logger;
 /**
  * Created by bschwaller on 28.02.15.
  */
-public class TestDriverWithoutProperties implements Driver {
+public class TestDriverStub implements Driver {
+
+    private String protocol;
+    private Connection returnConnection;
+
+    public TestDriverStub(String protocol, Connection returnConnection) {
+        this.protocol = protocol;
+        this.returnConnection = returnConnection;
+    }
 
     @Override
     public Connection connect(String url, Properties info) throws SQLException {
+        if (acceptsURL(url)) {
+            return returnConnection;
+        }
         return null;
     }
 
     @Override
     public boolean acceptsURL(String url) throws SQLException {
-        return true;
+        return url.contains(protocol);
     }
 
     @Override
