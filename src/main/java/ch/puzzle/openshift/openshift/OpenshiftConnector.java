@@ -29,7 +29,7 @@ public class OpenshiftConnector {
             ConnectionBuilder builder = new ConnectionBuilder(openshiftServerUrl);
             return builder.credentials(openshiftUser, openshiftPassword).timeout(OPENSHIFT_CONNECTION_TIMEOUT).create();
         } catch (IOException e) {
-            throw new RuntimeException("Could not create connection", e);
+            throw new RuntimeException("Could not create connection to openshift server", e);
         }
     }
 }
